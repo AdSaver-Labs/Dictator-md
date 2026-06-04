@@ -1,6 +1,6 @@
-name: WhisperDictation
+name: Dictator-md
 options:
-  bundleIdPrefix: com.sampop
+  bundleIdPrefix: com.dictatormd
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "16.0"
@@ -12,20 +12,20 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 
 targets:
-  WhisperDictation:
+  DictatorMD:
     type: application
     platform: macOS
     sources:
-      - path: WhisperDictation
+      - path: DictatorMD
         excludes:
           - "**/*.entitlements"
           - "Info.plist"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sampop.WhisperDictation
-        INFOPLIST_FILE: WhisperDictation/Info.plist
-        CODE_SIGN_ENTITLEMENTS: WhisperDictation/WhisperDictation.entitlements
-        SWIFT_OBJC_BRIDGING_HEADER: WhisperDictation/WhisperDictation-Bridging-Header.h
+        PRODUCT_BUNDLE_IDENTIFIER: com.dictatormd.DictatorMD
+        INFOPLIST_FILE: DictatorMD/Info.plist
+        CODE_SIGN_ENTITLEMENTS: DictatorMD/DictatorMD.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: DictatorMD/DictatorMD-Bridging-Header.h
         HEADER_SEARCH_PATHS:
           - "$(PROJECT_DIR)/lib"
         LIBRARY_SEARCH_PATHS:
@@ -55,25 +55,25 @@ targets:
       - sdk: CoreAudio.framework
       - sdk: ServiceManagement.framework
     info:
-      path: WhisperDictation/Info.plist
+      path: DictatorMD/Info.plist
       properties:
-        LSUIElement: true
-        NSMicrophoneUsageDescription: "WhisperDictation needs microphone access to capture your voice for speech-to-text transcription."
+        LSUIElement: false
+        NSMicrophoneUsageDescription: "Dictator-md needs microphone access to capture your voice for speech-to-text transcription."
         NSPrincipalClass: NSApplication
         CFBundleIconFile: AppIcon
     entitlements:
-      path: WhisperDictation/WhisperDictation.entitlements
+      path: DictatorMD/DictatorMD.entitlements
       properties:
         com.apple.security.device.audio-input: true
 
-  WhisperDictationTests:
+  DictatorMDTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: WhisperDictationTests
+      - path: DictatorMDTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.sampop.WhisperDictationTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.dictatormd.DictatorMDTests
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
-      - target: WhisperDictation
+      - target: DictatorMD

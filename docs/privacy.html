@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy &amp; Safety — WhisperDictation</title>
-    <meta name="description" content="How WhisperDictation handles your data (spoiler: it doesn't). Audit the code yourself.">
+    <title>Privacy &amp; Safety — Dictator-md</title>
+    <meta name="description" content="How Dictator-md handles your data (spoiler: it doesn't). Audit the code yourself.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,400;1,9..144,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -266,7 +266,7 @@
 
 <nav>
     <div class="nav-inner">
-        <a href="./" class="nav-brand">WhisperDictation</a>
+        <a href="./" class="nav-brand">Dictator-md</a>
         <a href="./" class="nav-back">&larr; Back</a>
     </div>
 </nav>
@@ -281,7 +281,7 @@
 
     <h2><span class="hash">#</span>The short version</h2>
     <p>
-        WhisperDictation runs entirely on your Mac. Your audio never leaves your machine.
+        Dictator-md runs entirely on your Mac. Your audio never leaves your machine.
         There is no server. There is no telemetry. There is no account.
         When we say "100% local," we mean it literally &mdash; and the source code is
         right there for you to confirm.
@@ -304,16 +304,16 @@
         line of code in a single <code class="kbd">grep</code>. Try this:
     </p>
     <div class="verify">
-        <div class="cmd"><span class="prompt">$</span> git clone https://github.com/sam-pop/WhisperDictation.git &amp;&amp; cd WhisperDictation</div>
-        <div class="cmd" style="margin-top: 8px;"><span class="prompt">$</span> grep -rE "URLSession|URLRequest|http" WhisperDictation/*.swift WhisperDictation/**/*.swift</div>
+        <div class="cmd"><span class="prompt">$</span> git clone https://github.com/AdSaver-Labs/Dictator-md.git &amp;&amp; cd Dictator-md</div>
+        <div class="cmd" style="margin-top: 8px;"><span class="prompt">$</span> grep -rE "URLSession|URLRequest|http" DictatorMD/*.swift DictatorMD/**/*.swift</div>
         <div class="out">
-            WhisperDictation/Engine/ModelManager.swift: "https://huggingface.co/ggerganov/whisper.cpp/..."<br>
-            WhisperDictation/Engine/ModelManager.swift: URLSession.shared.download(from: model.url, ...)
+            DictatorMD/Engine/ModelManager.swift: "https://huggingface.co/ggerganov/whisper.cpp/..."<br>
+            DictatorMD/Engine/ModelManager.swift: URLSession.shared.download(from: model.url, ...)
         </div>
         <div class="comment"># That's it. Every network call. All of them. Only fires when you click Download.</div>
     </div>
     <p>
-        <a href="https://github.com/sam-pop/WhisperDictation/blob/main/WhisperDictation/Engine/ModelManager.swift">Read ModelManager.swift &rarr;</a>
+        <a href="https://github.com/AdSaver-Labs/Dictator-md/blob/main/DictatorMD/Engine/ModelManager.swift">Read ModelManager.swift &rarr;</a>
         and see for yourself. Models come from HuggingFace because that's where the Whisper
         model files live &mdash; downloaded once, stored locally, never touched again.
     </p>
@@ -358,8 +358,8 @@
 
     <h2><span class="hash">#</span>Reporting security issues</h2>
     <p>
-        Found something concerning? Open an issue on <a href="https://github.com/sam-pop/WhisperDictation/issues">GitHub</a>
-        or see our <a href="https://github.com/sam-pop/WhisperDictation/blob/main/SECURITY.md">SECURITY.md</a>
+        Found something concerning? Open an issue on <a href="https://github.com/AdSaver-Labs/Dictator-md/issues">GitHub</a>
+        or see our <a href="https://github.com/AdSaver-Labs/Dictator-md/blob/main/SECURITY.md">SECURITY.md</a>
         for responsible disclosure.
     </p>
 

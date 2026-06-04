@@ -33,5 +33,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WhisperDictation.app
-          path: build/WhisperDictation.app
+          name: Dictator-md.app
+          path: build/Dictator-md.app

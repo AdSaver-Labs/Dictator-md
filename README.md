@@ -1,12 +1,12 @@
 <p align="center">
-  <h1 align="center">WhisperDictation</h1>
+  <h1 align="center">Dictator-md</h1>
   <p align="center">
     <strong>Free, local, and private dictation for macOS.</strong><br>
     Open-source speech-to-text that runs entirely on your Mac. No cloud, no subscriptions.<br>
     Hold a key. Speak. Release. Your words appear at the cursor.
   </p>
   <p align="center">
-    <a href="https://sam-pop.github.io/WhisperDictation/">Website</a> &bull;
+    <a href="https://dictatormd.app/">Website</a> &bull;
     <a href="#install-dmg">Download</a> &bull;
     <a href="#quick-start">Quick Start</a> &bull;
     <a href="#features">Features</a> &bull;
@@ -27,12 +27,12 @@
 
 **Free. Local. Private. No cloud. No API keys. No subscriptions. No data leaves your Mac.**
 
-WhisperDictation is a **free, open-source macOS dictation app** -- a local alternative to [Willow Voice](https://www.heywillow.io/), [WisprFlow](https://wisprflow.com/), and Apple Dictation. It runs OpenAI's [Whisper](https://github.com/openai/whisper) speech recognition model entirely on your machine using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) with Metal GPU acceleration. Your voice never leaves your computer.
+Dictator-md is a **free, open-source macOS dictation app** -- a local alternative to [Willow Voice](https://www.heywillow.io/), [WisprFlow](https://wisprflow.com/), and Apple Dictation. It runs OpenAI's [Whisper](https://github.com/openai/whisper) speech recognition model entirely on your machine using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) with Metal GPU acceleration. Your voice never leaves your computer.
 
-**Why WhisperDictation?**
+**Why Dictator-md?**
 - Apple's built-in dictation sends audio to Apple servers and has limited accuracy for technical terms
 - Commercial tools like Willow Voice and WisprFlow cost $8-15/month
-- WhisperDictation is **completely free**, runs **100% offline**, and is **optimized for developers** with 500+ technical terms built in
+- Dictator-md is **completely free**, runs **100% offline**, and is **optimized for developers** with 500+ technical terms built in
 
 ## Features
 
@@ -51,12 +51,12 @@ WhisperDictation is a **free, open-source macOS dictation app** -- a local alter
 
 ## Privacy & Safety
 
-WhisperDictation runs **100% locally**. Your audio never leaves your Mac. There is no server, no account, no telemetry, no tracking of any kind.
+Dictator-md runs **100% locally**. Your audio never leaves your Mac. There is no server, no account, no telemetry, no tracking of any kind.
 
 **Don't trust us — verify it yourself.** The entire app is ~2,500 lines of Swift. You can audit every network call in one command:
 
 ```bash
-grep -rE "URLSession|http" WhisperDictation/**/*.swift
+grep -rE "URLSession|http" DictatorMD/**/*.swift
 # Only match: ModelManager.swift (fetches Whisper models from HuggingFace when you click Download)
 ```
 
@@ -69,16 +69,16 @@ grep -rE "URLSession|http" WhisperDictation/**/*.swift
 - ❌ Load web fonts or external scripts
 - ❌ Require an account or an internet connection
 
-See the full [Privacy breakdown](https://sam-pop.github.io/WhisperDictation/privacy.html) and [SECURITY.md](SECURITY.md) for the threat model and disclosure policy.
+See the full [Privacy breakdown](https://dictatormd.app/privacy.html) and [SECURITY.md](SECURITY.md) for the threat model and disclosure policy.
 
 ## Install (DMG)
 
-Download the latest `.dmg` from [Releases](https://github.com/sam-pop/WhisperDictation/releases), open it, and drag WhisperDictation to Applications.
+Download the latest `.dmg` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), open it, and drag Dictator-md to Applications.
 
 > **Note: The app is not notarized by Apple.** macOS will block it on first launch. To open it on Mac:
-> 1. Open WhisperDictation -- macOS will show a warning that it can't verify the developer
+> 1. Open Dictator-md -- macOS will show a warning that it can't verify the developer
 > 2. Go to **System Settings > Privacy & Security**
-> 3. Scroll down and click **Open Anyway** next to the WhisperDictation message
+> 3. Scroll down and click **Open Anyway** next to the Dictator-md message
 > 4. Click **Open** in the confirmation dialog
 >
 > You only need to do this once. After that, the app opens normally.
@@ -88,7 +88,7 @@ Or build from source:
 ```bash
 # Create a DMG after building
 ./scripts/create-dmg.sh
-# Output: build/WhisperDictation.dmg
+# Output: build/Dictator-md.dmg
 ```
 
 ## Quick Start
@@ -103,8 +103,8 @@ brew install cmake         # CMake (for building whisper.cpp)
 ### Build from Source
 
 ```bash
-git clone --recurse-submodules https://github.com/sam-pop/WhisperDictation.git
-cd WhisperDictation
+git clone --recurse-submodules https://github.com/AdSaver-Labs/Dictator-md.git
+cd Dictator-md
 
 # 1. Build whisper.cpp static library (~1 min)
 ./scripts/build-whisper.sh
@@ -120,7 +120,7 @@ make run
 ### First Launch
 
 1. **Microphone** -- macOS will prompt automatically. Click Allow.
-2. **Accessibility** -- required for the global hotkey and text injection. The app will guide you to System Settings > Privacy & Security > Accessibility. Add WhisperDictation and toggle it on.
+2. **Accessibility** -- required for the global hotkey and text injection. The app will guide you to System Settings > Privacy & Security > Accessibility. Add Dictator-md and toggle it on.
 
 Once both permissions are granted, you'll see a green "Ready" status in the menu bar dropdown.
 
@@ -188,14 +188,14 @@ Or download directly from the Settings > Model tab in the app.
 
 ## Grammar Correction
 
-WhisperDictation automatically cleans up Whisper's raw output with a local, rule-based corrector (<5ms overhead):
+Dictator-md automatically cleans up Whisper's raw output with a local, rule-based corrector (<5ms overhead):
 
 **Capitalization**
 - First letter of every sentence
 - Standalone "I", "I'm", "I'll", "I've"
 
 **500+ Developer Term Corrections**
-| Whisper says | WhisperDictation outputs |
+| Whisper says | Dictator-md outputs |
 |-------------|------------------------|
 | "create a rest api" | "Create a REST API." |
 | "set up the ci cd pipeline" | "Set up the CI/CD pipeline." |
@@ -261,7 +261,7 @@ make clean      # Remove build artifacts
 
 ```bash
 ./scripts/create-dmg.sh
-# -> build/WhisperDictation.dmg
+# -> build/Dictator-md.dmg
 ```
 
 ### Xcode Development
@@ -269,13 +269,13 @@ make clean      # Remove build artifacts
 ```bash
 brew install xcodegen
 xcodegen generate        # Generate .xcodeproj from project.yml
-open WhisperDictation.xcodeproj
+open Dictator-md.xcodeproj
 ```
 
 ## Project Structure
 
 ```
-WhisperDictation/
+Dictator-md/
   App/                        SwiftUI @main entry point, MenuBarExtra
   Engine/
     AudioCapture.swift         AVAudioEngine mic recording + resampling
@@ -341,7 +341,7 @@ Contributions are welcome! Here's how to get started:
 
 ## Troubleshooting
 
-**"Failed to create event tap"** -- Accessibility permission is not granted. Go to System Settings > Privacy & Security > Accessibility and add WhisperDictation.
+**"Failed to create event tap"** -- Accessibility permission is not granted. Go to System Settings > Privacy & Security > Accessibility and add Dictator-md.
 
 **No audio captured / empty transcription** -- Microphone permission is not granted, or the wrong input device is selected.
 

@@ -21,6 +21,24 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
         var id: String { fileName }
 
         // Full precision models
+        static let base = ModelInfo(
+            name: "Base (Multilingual)", fileName: "ggml-base.bin",
+            size: "142 MB", speed: "Fastest", accuracy: "Good",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin")!,
+            isQuantized: false
+        )
+        static let small = ModelInfo(
+            name: "Small (Multilingual)", fileName: "ggml-small.bin",
+            size: "466 MB", speed: "Balanced", accuracy: "Better",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin")!,
+            isQuantized: false
+        )
+        static let medium = ModelInfo(
+            name: "Medium (Multilingual)", fileName: "ggml-medium.bin",
+            size: "1.5 GB", speed: "Slower", accuracy: "Best",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin")!,
+            isQuantized: false
+        )
         static let baseEn = ModelInfo(
             name: "Base (English)", fileName: "ggml-base.en.bin",
             size: "142 MB", speed: "Fastest", accuracy: "Good",
@@ -41,6 +59,24 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
         )
 
         // Quantized models — smaller + faster with near-identical accuracy
+        static let baseQ5 = ModelInfo(
+            name: "Base Q5 (Multilingual)", fileName: "ggml-base-q5_1.bin",
+            size: "57 MB", speed: "Fastest", accuracy: "Good",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin")!,
+            isQuantized: true
+        )
+        static let smallQ5 = ModelInfo(
+            name: "Small Q5 (Multilingual)", fileName: "ggml-small-q5_1.bin",
+            size: "181 MB", speed: "Fast", accuracy: "Better",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin")!,
+            isQuantized: true
+        )
+        static let mediumQ5 = ModelInfo(
+            name: "Medium Q5 (Multilingual)", fileName: "ggml-medium-q5_0.bin",
+            size: "515 MB", speed: "Balanced", accuracy: "Best",
+            url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin")!,
+            isQuantized: true
+        )
         static let baseEnQ5 = ModelInfo(
             name: "Base Q5 (English)", fileName: "ggml-base.en-q5_1.bin",
             size: "57 MB", speed: "Fastest", accuracy: "Good",
@@ -68,15 +104,17 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
             isQuantized: false
         )
 
-        static let all: [ModelInfo] = [baseEnQ5, smallEnQ5, mediumEnQ5, baseEn, smallEn, mediumEn]
-        static let recommended: [ModelInfo] = [baseEnQ5, smallEnQ5, mediumEnQ5]
+        static let all: [ModelInfo] = [
+            baseQ5, smallQ5, mediumQ5,
+            baseEnQ5, smallEnQ5, mediumEnQ5,
+            base, small, medium,
+            baseEn, smallEn, mediumEn
+        ]
+        static let recommended: [ModelInfo] = [baseQ5, smallQ5, mediumQ5, smallEnQ5]
     }
 
     var modelsDirectory: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("WhisperDictation/Models", isDirectory: true)
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        AppPaths.supportSubdirectory("Models")
     }
 
     func activeModelPath() -> String? {

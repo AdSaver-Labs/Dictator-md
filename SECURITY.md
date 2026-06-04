@@ -2,7 +2,7 @@
 
 ## Threat Model
 
-WhisperDictation is a macOS dictation app that requires two sensitive permissions: **Microphone** and **Accessibility**. Because of this, we take security seriously and have designed the app to minimize attack surface.
+Dictator-md is a macOS dictation app that requires two sensitive permissions: **Microphone** and **Accessibility**. Because of this, we take security seriously and have designed the app to minimize attack surface.
 
 ### What the app does
 
@@ -26,12 +26,12 @@ WhisperDictation is a macOS dictation app that requires two sensitive permission
 The entire app is ~2,500 lines of Swift. You can verify every network-facing line in one command:
 
 ```bash
-git clone https://github.com/sam-pop/WhisperDictation.git
-cd WhisperDictation
-grep -rE "URLSession|URLRequest|http://|https://|NSURLConnection|Network\.framework" WhisperDictation/**/*.swift
+git clone https://github.com/AdSaver-Labs/Dictator-md.git
+cd Dictator-md
+grep -rE "URLSession|URLRequest|http://|https://|NSURLConnection|Network\.framework" DictatorMD/**/*.swift
 ```
 
-The only matches are in `WhisperDictation/Engine/ModelManager.swift` — URLs for HuggingFace model files and the `URLSession.shared.download` call that fetches them when the user clicks "Download" in Settings > Model.
+The only matches are in `DictatorMD/Engine/ModelManager.swift` — URLs for HuggingFace model files and the `URLSession.shared.download` call that fetches them when the user clicks "Download" in Settings > Model.
 
 We also recommend running a firewall like [Little Snitch](https://www.obdev.at/products/littlesnitch/) or [LuLu](https://objective-see.org/products/lulu.html) while testing the app. You will see zero outbound connections during normal use.
 
@@ -40,10 +40,10 @@ We also recommend running a firewall like [Little Snitch](https://www.obdev.at/p
 Don't want to trust the pre-built DMG? Build from source:
 
 ```bash
-git clone --recurse-submodules https://github.com/sam-pop/WhisperDictation.git
-cd WhisperDictation
+git clone --recurse-submodules https://github.com/AdSaver-Labs/Dictator-md.git
+cd Dictator-md
 make whisper && make app
-open build/WhisperDictation.app
+open build/Dictator-md.app
 ```
 
 The Makefile compiles directly via `xcrun swiftc` with no opaque build steps. You can read the entire pipeline in the [Makefile](Makefile).
@@ -58,7 +58,7 @@ No third-party Swift packages, no CocoaPods, no Carthage. The only external code
 
 ## Code Signing
 
-Releases are currently **ad-hoc signed** (not notarized by Apple). This means macOS Gatekeeper will show a warning on first launch. We document how to bypass this in the [install instructions](https://sam-pop.github.io/WhisperDictation/#install). Formal Developer ID notarization is planned once the project enrolls in the Apple Developer Program.
+Releases are currently **ad-hoc signed** (not notarized by Apple). This means macOS Gatekeeper will show a warning on first launch. We document how to bypass this in the [install instructions](https://dictatormd.app/#install). Formal Developer ID notarization is planned once the project enrolls in the Apple Developer Program.
 
 Every release DMG will include a SHA256 checksum in the release notes so you can verify integrity.
 
@@ -67,7 +67,7 @@ Every release DMG will include a SHA256 checksum in the release notes so you can
 If you discover a security issue, please **do not open a public issue**. Instead:
 
 1. Email the maintainer directly (see [GitHub profile](https://github.com/sam-pop)), or
-2. Open a [private security advisory](https://github.com/sam-pop/WhisperDictation/security/advisories/new) on GitHub
+2. Open a [private security advisory](https://github.com/AdSaver-Labs/Dictator-md/security/advisories/new) on GitHub
 
 We aim to respond within 72 hours. Critical issues will be patched and disclosed on an accelerated timeline.
 

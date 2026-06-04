@@ -28,6 +28,10 @@ struct MenuBarView: View {
                     .padding(.bottom, 10)
             }
 
+            languageSection
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+
             Divider()
                 .padding(.horizontal, 12)
 
@@ -37,7 +41,7 @@ struct MenuBarView: View {
                     openWindow(id: "settings")
                     NSApp.activate(ignoringOtherApps: true)
                 }
-                MenuButton(title: "Quit WhisperDictation", icon: "power", shortcut: "Q") {
+                MenuButton(title: "Quit Dictator-md", icon: "power", shortcut: "Q") {
                     NSApplication.shared.terminate(nil)
                 }
             }
@@ -77,7 +81,7 @@ struct MenuBarView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text("WhisperDictation")
+                    Text("Dictator-md")
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                     // Model badge — short friendly name
@@ -90,6 +94,13 @@ struct MenuBarView: View {
                             .background(Capsule().fill(.blue.opacity(0.12)))
                             .foregroundStyle(.blue)
                     }
+                    Text(settings.dictationLanguage.label)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .tracking(0.3)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(.purple.opacity(0.12)))
+                        .foregroundStyle(.purple)
                 }
                 HStack(spacing: 6) {
                     Circle()
@@ -106,6 +117,16 @@ struct MenuBarView: View {
         }
     }
 
+    private var languageSection: some View {
+        Picker("Language", selection: $settings.dictationLanguage) {
+            ForEach(AppSettings.DictationLanguage.allCases) { language in
+                Text(language.label).tag(language)
+            }
+        }
+        .pickerStyle(.segmented)
+        .font(.system(size: 11))
+    }
+
     // MARK: - Alerts
 
     private var alertsSection: some View {
@@ -113,11 +134,6 @@ struct MenuBarView: View {
             if !permissions.microphoneGranted {
                 AlertRow(icon: "mic.slash.fill", text: "Microphone access needed", color: .orange) {
                     permissions.requestMicrophone()
-                }
-            }
-            if !permissions.accessibilityGranted {
-                AlertRow(icon: "hand.raised.fill", text: "Accessibility access needed", color: .orange) {
-                    permissions.openAccessibilitySettings()
                 }
             }
             if let error = engine.modelLoadError {

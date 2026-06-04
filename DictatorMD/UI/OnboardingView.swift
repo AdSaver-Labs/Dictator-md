@@ -11,7 +11,7 @@ struct OnboardingView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.blue)
 
-            Text("Welcome to WhisperDictation")
+            Text("Welcome to Dictator-md")
                 .font(.title)
                 .fontWeight(.bold)
 

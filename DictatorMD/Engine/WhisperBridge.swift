@@ -34,7 +34,7 @@ private func segmentCallback(
 
 final class WhisperBridge: @unchecked Sendable {
     private let context: OpaquePointer
-    private let queue = DispatchQueue(label: "com.whisperdictation.whisper", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.DictatorMD.whisper", qos: .userInitiated)
     private let vadModelPath: String?
 
     private static var isAppleSilicon: Bool {
@@ -94,6 +94,8 @@ final class WhisperBridge: @unchecked Sendable {
     /// Returns the full concatenated transcription when complete.
     func transcribe(
         audioBuffer: [Float],
+        language: AppSettings.DictationLanguage = .auto,
+        useVAD: Bool = true,
         prompt: String = "",
         onSegment: ((String) -> Void)? = nil
     ) -> String {
@@ -101,8 +103,10 @@ final class WhisperBridge: @unchecked Sendable {
             let startTime = CFAbsoluteTimeGetCurrent()
             let audioDuration = Double(audioBuffer.count) / 16000.0
 
-            // Adaptive decoding: greedy for short clips (<2s), beam search for longer
-            let useBeamSearch = Self.isAppleSilicon && audioBuffer.count >= 32000
+            // Adaptive decoding: beam search is much more reliable for short phrases,
+            // especially with auto language detection. Keep the fast greedy path for
+            // genuinely long dictations where beam search becomes the main delay.
+            let useBeamSearch = Self.isAppleSilicon && audioDuration <= 18.0
             var params = useBeamSearch
                 ? whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH)
                 : whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
@@ -111,10 +115,23 @@ final class WhisperBridge: @unchecked Sendable {
                 params.beam_search.beam_size = 5
             }
 
+            // Threads
+            let threadCount = Self.isAppleSilicon
+                ? max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
+                : max(1, ProcessInfo.processInfo.activeProcessorCount)
+
+            let effectiveLanguage = Self.resolveLanguage(
+                requestedLanguage: language,
+                audioBuffer: audioBuffer,
+                context: context,
+                threadCount: threadCount
+            )
+            let decodePrompt = Self.decodePrompt(prompt, for: effectiveLanguage)
+
             // Allocate C strings (freed in defer)
-            let langCStr = strdup("en")
+            let langCStr = strdup(effectiveLanguage.whisperCode)
             let suppressCStr = strdup("(Thank you|Thanks for watching|Please subscribe|you)")
-            let promptCStr = prompt.isEmpty ? nil : strdup(prompt)
+            let promptCStr = decodePrompt.isEmpty ? nil : strdup(decodePrompt)
             var vadPathCStr: UnsafeMutablePointer<CChar>?
 
             params.language = UnsafePointer(langCStr)
@@ -134,14 +151,10 @@ final class WhisperBridge: @unchecked Sendable {
             params.logprob_thold = -1.0
             params.no_speech_thold = 0.6
 
-            // Threads
-            let threadCount = Self.isAppleSilicon
-                ? max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
-                : max(1, ProcessInfo.processInfo.activeProcessorCount)
             params.n_threads = Int32(threadCount)
 
             // VAD
-            if let vadPath = self.vadModelPath {
+            if useVAD, let vadPath = self.vadModelPath {
                 params.vad = true
                 vadPathCStr = strdup(vadPath)
                 params.vad_model_path = UnsafePointer(vadPathCStr)
@@ -169,7 +182,8 @@ final class WhisperBridge: @unchecked Sendable {
             }
 
             let strategy = useBeamSearch ? "beam(5)" : "greedy"
-            fputs("[WhisperBridge] \(String(format: "%.1f", audioDuration))s | \(strategy) | \(threadCount)T | streaming: \(onSegment != nil)\n", stderr)
+            fputs("[WhisperBridge] \(String(format: "%.1f", audioDuration))s | \(strategy) | \(threadCount)T | language=\(effectiveLanguage.whisperCode) requested=\(language.whisperCode) | vad=\(useVAD) | streaming: \(onSegment != nil)\n", stderr)
+            DebugLog.shared.log("[WhisperBridge] start seconds=\(String(format: "%.2f", audioDuration)) strategy=\(strategy) threads=\(threadCount) language=\(effectiveLanguage.whisperCode) requested=\(language.whisperCode) vad=\(useVAD)")
 
             let result = audioBuffer.withUnsafeBufferPointer { bufferPtr in
                 whisper_full(context, params, bufferPtr.baseAddress, Int32(audioBuffer.count))
@@ -179,6 +193,7 @@ final class WhisperBridge: @unchecked Sendable {
 
             guard result == 0 else {
                 fputs("[WhisperBridge] Failed (\(result)) in \(String(format: "%.2f", elapsed))s\n", stderr)
+                DebugLog.shared.log("[WhisperBridge] failed code=\(result) elapsed=\(String(format: "%.2f", elapsed))")
                 return ""
             }
 
@@ -193,7 +208,97 @@ final class WhisperBridge: @unchecked Sendable {
 
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             fputs("[WhisperBridge] Done (\(String(format: "%.2f", elapsed))s): \"\(trimmed)\"\n", stderr)
+            DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count) text=\"\(trimmed)\"")
             return trimmed
+        }
+    }
+
+    private static func resolveLanguage(
+        requestedLanguage: AppSettings.DictationLanguage,
+        audioBuffer: [Float],
+        context: OpaquePointer,
+        threadCount: Int
+    ) -> AppSettings.DictationLanguage {
+        switch requestedLanguage {
+        case .english, .bulgarian:
+            return requestedLanguage
+        case .auto:
+            break
+        }
+
+        let maxLanguageID = whisper_lang_max_id()
+        guard maxLanguageID > 0 else { return .english }
+
+        let melStatus = audioBuffer.withUnsafeBufferPointer { ptr in
+            whisper_pcm_to_mel(context, ptr.baseAddress, Int32(audioBuffer.count), Int32(threadCount))
+        }
+        guard melStatus == 0 else {
+            DebugLog.shared.log("[WhisperBridge] restrictedAuto melFailed status=\(melStatus) fallback=en")
+            return .english
+        }
+
+        var probabilities = [Float](repeating: 0, count: Int(maxLanguageID) + 1)
+        let topLanguageID = probabilities.withUnsafeMutableBufferPointer { ptr in
+            whisper_lang_auto_detect(context, 0, Int32(threadCount), ptr.baseAddress)
+        }
+
+        let englishID = whisper_lang_id("en")
+        let bulgarianID = whisper_lang_id("bg")
+        let englishProbability = Self.probability(probabilities, id: englishID)
+        let bulgarianProbability = Self.probability(probabilities, id: bulgarianID)
+        let topLanguage = Self.languageCode(for: topLanguageID) ?? "unknown"
+
+        // Auto mode is intentionally restricted to the two languages the app supports.
+        // Default to English unless Bulgarian is clearly stronger.
+        let chosen: AppSettings.DictationLanguage =
+            bulgarianProbability >= 0.05 && bulgarianProbability > englishProbability * 1.25
+            ? .bulgarian
+            : .english
+
+        DebugLog.shared.log("[WhisperBridge] restrictedAuto top=\(topLanguage) en=\(String(format: "%.4f", englishProbability)) bg=\(String(format: "%.4f", bulgarianProbability)) chosen=\(chosen.whisperCode)")
+        return chosen
+    }
+
+    private static func probability(_ probabilities: [Float], id: Int32) -> Float {
+        guard id >= 0, Int(id) < probabilities.count else { return 0 }
+        return probabilities[Int(id)]
+    }
+
+    private static func languageCode(for id: Int32) -> String? {
+        guard id >= 0, let cString = whisper_lang_str(id) else { return nil }
+        return String(cString: cString)
+    }
+
+    private static func decodePrompt(_ prompt: String, for language: AppSettings.DictationLanguage) -> String {
+        let languagePrompt: String
+        let userPrompt: String
+
+        switch language {
+        case .english:
+            languagePrompt = """
+            Transcribe in English only. Use the Latin alphabet only. Never output Russian, Bulgarian, Cyrillic, or Cyrillic transliteration. If speech is unclear, choose the closest English words. Preserve technical terms such as Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent, account, authentication, re-authentication.
+            """
+            userPrompt = prompt
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { !Self.containsCyrillic(String($0)) }
+                .joined(separator: "\n")
+        case .bulgarian:
+            languagePrompt = """
+            Транскрибирай на български език с българска кирилица. Не използвай руски думи и не превключвай към руски. Запазвай английски технически термини като Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent.
+            """
+            userPrompt = prompt
+        case .auto:
+            languagePrompt = ""
+            userPrompt = prompt
+        }
+
+        let trimmedPrompt = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedPrompt.isEmpty ? languagePrompt : languagePrompt + "\n" + trimmedPrompt
+    }
+
+    private static func containsCyrillic(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            (0x0400...0x04FF).contains(Int(scalar.value))
         }
     }
 }

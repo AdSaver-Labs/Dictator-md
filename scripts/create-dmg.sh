@@ -1,14 +1,14 @@
 #!/bin/bash
-# Create a DMG installer for WhisperDictation
+# Create a DMG installer for Dictator-md
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_BUNDLE="$BUILD_DIR/WhisperDictation.app"
-DMG_NAME="WhisperDictation"
+APP_BUNDLE="$BUILD_DIR/Dictator-md.app"
+DMG_NAME="Dictator-md"
 DMG_OUTPUT="$BUILD_DIR/${DMG_NAME}.dmg"
-VOLUME_NAME="WhisperDictation"
+VOLUME_NAME="Dictator-md"
 
 if [ ! -d "$APP_BUNDLE" ]; then
     echo "Error: $APP_BUNDLE not found. Run 'make app' first."
@@ -23,7 +23,7 @@ TMP_DIR=$(mktemp -d)
 cp -R "$APP_BUNDLE" "$TMP_DIR/"
 
 # Remove quarantine attribute so the icon shows correctly in the DMG
-xattr -cr "$TMP_DIR/WhisperDictation.app" 2>/dev/null || true
+xattr -cr "$TMP_DIR/Dictator-md.app" 2>/dev/null || true
 
 ln -s /Applications "$TMP_DIR/Applications"
 

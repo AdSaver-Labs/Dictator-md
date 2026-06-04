@@ -7,7 +7,7 @@ MODEL_FILE="ggml-${MODEL_NAME}.bin"
 MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_FILE}"
 
 # App stores models in Application Support
-APP_SUPPORT_DIR="$HOME/Library/Application Support/WhisperDictation/Models"
+APP_SUPPORT_DIR="$HOME/Library/Application Support/Dictator-md/Models"
 mkdir -p "$APP_SUPPORT_DIR"
 
 DEST="$APP_SUPPORT_DIR/$MODEL_FILE"

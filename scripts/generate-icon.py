@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate an app icon for WhisperDictation using AppKit/CoreGraphics."""
+"""Generate the Dictator-md app icon using AppKit/CoreGraphics."""
+import os
 import subprocess
 import sys
-import os
 import tempfile
 
-SWIFT_ICON_RENDERER = '''
+SWIFT_ICON_RENDERER = r'''
 import AppKit
 
 let sizes: [(Int, String)] = [
@@ -21,120 +21,73 @@ let sizes: [(Int, String)] = [
     (1024, "icon_512x512@2x.png"),
 ]
 
+func roundedPath(_ rect: CGRect, _ radius: CGFloat) -> CGPath {
+    CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+}
+
 func renderIcon(size: Int) -> NSImage {
     let img = NSImage(size: NSSize(width: size, height: size))
     img.lockFocus()
-    let ctx = NSGraphicsContext.current!.cgContext
+
+    guard let nsContext = NSGraphicsContext.current else {
+        img.unlockFocus()
+        return img
+    }
+
+    let ctx = nsContext.cgContext
     let s = CGFloat(size)
+    ctx.clear(CGRect(x: 0, y: 0, width: s, height: s))
 
-    // Background: dark rounded rect
-    let bgRect = CGRect(x: 0, y: 0, width: s, height: s)
-    let cornerRadius = s * 0.22
-    let bgPath = CGPath(roundedRect: bgRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+    // Keep the artwork slightly inset so it visually matches standard macOS app icons.
+    let tileInset = s * 0.075
+    let tile = CGRect(x: tileInset, y: tileInset, width: s - tileInset * 2, height: s - tileInset * 2)
+    let tileRadius = tile.width * 0.215
 
-    // Dark gradient background
     ctx.saveGState()
-    ctx.addPath(bgPath)
+    ctx.addPath(roundedPath(tile, tileRadius))
     ctx.clip()
-    let bgColors = [
-        CGColor(red: 0.08, green: 0.08, blue: 0.18, alpha: 1.0),
-        CGColor(red: 0.06, green: 0.10, blue: 0.22, alpha: 1.0),
+
+    let yellowColors = [
+        CGColor(red: 1.00, green: 0.91, blue: 0.35, alpha: 1.0),
+        CGColor(red: 1.00, green: 0.73, blue: 0.10, alpha: 1.0),
     ]
-    let bgGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: bgColors as CFArray, locations: [0.0, 1.0])!
-    ctx.drawLinearGradient(bgGradient, start: CGPoint(x: 0, y: s), end: CGPoint(x: s, y: 0), options: [])
+    let yellowGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: yellowColors as CFArray, locations: [0.0, 1.0])!
+    ctx.drawLinearGradient(
+        yellowGradient,
+        start: CGPoint(x: tile.minX, y: tile.maxY),
+        end: CGPoint(x: tile.maxX, y: tile.minY),
+        options: []
+    )
+
+    ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.10))
+    ctx.fill(CGRect(x: tile.minX, y: tile.midY, width: tile.width, height: tile.height / 2))
     ctx.restoreGState()
 
-    // Accent color: cyan-blue gradient
-    let accentColors = [
-        CGColor(red: 0.31, green: 0.67, blue: 1.0, alpha: 1.0),  // #4facfe
-        CGColor(red: 0.0, green: 0.95, blue: 1.0, alpha: 1.0),   // #00f2fe
-    ]
-    let accentGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: accentColors as CFArray, locations: [0.0, 1.0])!
-
-    func fillWithAccent(_ path: CGPath) {
-        ctx.saveGState()
-        ctx.addPath(path)
-        ctx.clip()
-        let bounds = path.boundingBox
-        ctx.drawLinearGradient(accentGradient, start: CGPoint(x: bounds.midX, y: bounds.maxY), end: CGPoint(x: bounds.midX, y: bounds.minY), options: [])
-        ctx.restoreGState()
-    }
-
-    // Waveform bars - left side
-    let barWidth = s * 0.047
-    let barRadius = barWidth / 2
-    let leftBars: [(x: CGFloat, height: CGFloat)] = [
-        (0.155, 0.14),
-        (0.22, 0.30),
-        (0.285, 0.20),
-    ]
-    for bar in leftBars {
-        let x = s * bar.x - barWidth / 2
-        let h = s * bar.height
-        let y = (s - h) / 2
-        let rect = CGRect(x: x, y: y, width: barWidth, height: h)
-        let path = CGPath(roundedRect: rect, cornerWidth: barRadius, cornerHeight: barRadius, transform: nil)
-        ctx.setAlpha(0.7)
-        fillWithAccent(path)
-        ctx.setAlpha(1.0)
-    }
-
-    // Microphone body (rounded rect / capsule)
-    let micWidth = s * 0.14
-    let micHeight = s * 0.31
-    let micX = (s - micWidth) / 2
-    let micY = s * 0.42
-    let micRect = CGRect(x: micX, y: micY, width: micWidth, height: micHeight)
-    let micPath = CGPath(roundedRect: micRect, cornerWidth: micWidth / 2, cornerHeight: micWidth / 2, transform: nil)
-    fillWithAccent(micPath)
-
-    // Mic stand arc
-    let arcCenter = CGPoint(x: s / 2, y: s * 0.42)
-    let arcRadius = s * 0.12
-    ctx.saveGState()
-    let arcPath = CGMutablePath()
-    arcPath.addArc(center: arcCenter, radius: arcRadius, startAngle: .pi * 0.05, endAngle: .pi * 0.95, clockwise: false)
-    ctx.addPath(arcPath)
-    ctx.setLineWidth(s * 0.038)
-    ctx.setLineCap(.round)
-    // Stroke with accent color (use the lighter cyan)
-    ctx.setStrokeColor(CGColor(red: 0.15, green: 0.82, blue: 1.0, alpha: 1.0))
+    ctx.addPath(roundedPath(tile.insetBy(dx: tile.width * 0.008, dy: tile.height * 0.008), tileRadius))
+    ctx.setStrokeColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.16))
+    ctx.setLineWidth(max(1, tile.width * 0.012))
     ctx.strokePath()
-    ctx.restoreGState()
 
-    // Mic stand (vertical line)
-    let standWidth = s * 0.038
-    let standX = (s - standWidth) / 2
-    let standY = s * 0.22
-    let standHeight = s * 0.10
-    let standRect = CGRect(x: standX, y: standY, width: standWidth, height: standHeight)
-    let standPath = CGPath(roundedRect: standRect, cornerWidth: standWidth / 2, cornerHeight: standWidth / 2, transform: nil)
-    fillWithAccent(standPath)
-
-    // Mic base (horizontal)
-    let baseWidth = s * 0.15
-    let baseHeight = s * 0.038
-    let baseX = (s - baseWidth) / 2
-    let baseY = s * 0.20
-    let baseRect = CGRect(x: baseX, y: baseY, width: baseWidth, height: baseHeight)
-    let basePath = CGPath(roundedRect: baseRect, cornerWidth: baseHeight / 2, cornerHeight: baseHeight / 2, transform: nil)
-    fillWithAccent(basePath)
-
-    // Waveform bars - right side
-    let rightBars: [(x: CGFloat, height: CGFloat)] = [
-        (0.715, 0.20),
-        (0.78, 0.30),
-        (0.845, 0.14),
-    ]
-    for bar in rightBars {
-        let x = s * bar.x - barWidth / 2
-        let h = s * bar.height
-        let y = (s - h) / 2
-        let rect = CGRect(x: x, y: y, width: barWidth, height: h)
-        let path = CGPath(roundedRect: rect, cornerWidth: barRadius, cornerHeight: barRadius, transform: nil)
-        ctx.setAlpha(0.7)
-        fillWithAccent(path)
-        ctx.setAlpha(1.0)
+    let center = CGPoint(x: tile.midX, y: tile.midY)
+    let ink = CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 1.0)
+    let symbolPointSize = tile.width * 0.47
+    let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .bold)
+    if let symbol = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: nil)?
+        .withSymbolConfiguration(symbolConfig) {
+        let symbolHeight = tile.width * 0.49
+        let aspect = max(0.35, symbol.size.width / max(symbol.size.height, 1))
+        let symbolWidth = symbolHeight * aspect
+        let symbolRect = CGRect(
+            x: center.x - symbolWidth / 2,
+            y: center.y - symbolHeight / 2,
+            width: symbolWidth,
+            height: symbolHeight
+        )
+        NSGraphicsContext.saveGraphicsState()
+        NSColor(cgColor: ink)?.set()
+        symbol.isTemplate = true
+        symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     img.unlockFocus()
@@ -142,21 +95,25 @@ func renderIcon(size: Int) -> NSImage {
 }
 
 let outputDir = CommandLine.arguments[1]
-
-// Create iconset
 let iconsetPath = outputDir + "/AppIcon.iconset"
-try? FileManager.default.createDirectory(atPath: iconsetPath, withIntermediateDirectories: true)
+try? FileManager.default.removeItem(atPath: iconsetPath)
+try! FileManager.default.createDirectory(atPath: iconsetPath, withIntermediateDirectories: true)
 
 for (size, name) in sizes {
     let image = renderIcon(size: size)
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
-        pixelsWide: size, pixelsHigh: size,
-        bitsPerSample: 8, samplesPerPixel: 4,
-        hasAlpha: true, isPlanar: false,
+        pixelsWide: size,
+        pixelsHigh: size,
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
         colorSpaceName: .deviceRGB,
-        bytesPerRow: 0, bitsPerPixel: 0
+        bytesPerRow: 0,
+        bitsPerPixel: 0
     )!
+
     rep.size = NSSize(width: size, height: size)
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
@@ -164,49 +121,49 @@ for (size, name) in sizes {
     NSGraphicsContext.restoreGraphicsState()
 
     let pngData = rep.representation(using: .png, properties: [:])!
-    let filePath = iconsetPath + "/" + name
-    try! pngData.write(to: URL(fileURLWithPath: filePath))
+    try! pngData.write(to: URL(fileURLWithPath: iconsetPath + "/" + name))
 }
 
-// Convert to icns
 let process = Process()
 process.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 process.arguments = ["-c", "icns", iconsetPath, "-o", outputDir + "/AppIcon.icns"]
 try! process.run()
 process.waitUntilExit()
 
-// Cleanup iconset
 try? FileManager.default.removeItem(atPath: iconsetPath)
-print("[Icon] Generated \\(outputDir)/AppIcon.icns")
+print("[Icon] Generated \(outputDir)/AppIcon.icns")
 '''
 
-def generate_icon(resources_dir):
-    """Render the icon using a Swift script that uses AppKit/CoreGraphics."""
+
+def generate_icon(resources_dir: str) -> None:
     os.makedirs(resources_dir, exist_ok=True)
 
-    # Write Swift script to temp file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.swift', delete=False) as f:
-        f.write(SWIFT_ICON_RENDERER)
-        swift_path = f.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".swift", delete=False) as file:
+        file.write(SWIFT_ICON_RENDERER)
+        swift_path = file.name
 
+    binary_path = swift_path.removesuffix(".swift")
     try:
-        # Compile and run the Swift script
-        binary_path = swift_path.replace('.swift', '')
-        subprocess.run([
-            'swiftc', swift_path,
-            '-framework', 'AppKit',
-            '-o', binary_path
-        ], check=True, capture_output=True)
-
+        subprocess.run(
+            ["swiftc", swift_path, "-framework", "AppKit", "-o", binary_path],
+            check=True,
+            capture_output=True,
+        )
         subprocess.run([binary_path, resources_dir], check=True)
     finally:
-        os.unlink(swift_path)
-        if os.path.exists(binary_path):
+        try:
+            os.unlink(swift_path)
+        except FileNotFoundError:
+            pass
+        try:
             os.unlink(binary_path)
+        except FileNotFoundError:
+            pass
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: generate-icon.py <Resources_dir>")
         sys.exit(1)
+
     generate_icon(sys.argv[1])

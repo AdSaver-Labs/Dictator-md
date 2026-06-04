@@ -6,6 +6,7 @@ final class PermissionManager: ObservableObject, @unchecked Sendable {
 
     @Published var microphoneGranted = false
     @Published var accessibilityGranted = false
+    private var lastAccessibilityPromptAt = Date.distantPast
 
     var allPermissionsGranted: Bool {
         microphoneGranted && accessibilityGranted
@@ -13,6 +14,7 @@ final class PermissionManager: ObservableObject, @unchecked Sendable {
 
     init() {
         checkPermissions()
+        requestMicrophoneIfNotDetermined()
     }
 
     func checkPermissions() {
@@ -39,17 +41,45 @@ final class PermissionManager: ObservableObject, @unchecked Sendable {
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
                 self?.microphoneGranted = granted
+                DebugLog.shared.log("[PermissionManager] requestMicrophone granted=\(granted)")
             }
         }
+    }
+
+    func requestMicrophoneIfNotDetermined() {
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else { return }
+        DebugLog.shared.log("[PermissionManager] requestMicrophoneIfNotDetermined")
+        requestMicrophone()
     }
 
     // MARK: - Accessibility
 
     func checkAccessibility() {
-        accessibilityGranted = AXIsProcessTrusted()
+        let trusted = AXIsProcessTrusted()
+        accessibilityGranted = trusted
+        DebugLog.shared.log("[PermissionManager] checkAccessibility trusted=\(trusted) eventTapOperational=\(HotkeyMonitor.eventTapOperational) shownGranted=\(accessibilityGranted)")
+    }
+
+    func requestAccessibilityPromptIfNeeded() {
+        guard !AXIsProcessTrusted() else { return }
+        promptForAccessibilityIfNeeded()
+    }
+
+    func markAccessibilityOperational() {
+        let trusted = AXIsProcessTrusted()
+        accessibilityGranted = trusted
+        DebugLog.shared.log("[PermissionManager] markAccessibilityOperational trusted=\(trusted)")
+    }
+
+    private func promptForAccessibilityIfNeeded(force: Bool = false) {
+        guard force || Date().timeIntervalSince(lastAccessibilityPromptAt) > 30 else { return }
+        lastAccessibilityPromptAt = Date()
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 
     func openAccessibilitySettings() {
+        promptForAccessibilityIfNeeded(force: true)
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }

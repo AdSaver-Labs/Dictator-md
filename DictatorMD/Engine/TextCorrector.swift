@@ -21,6 +21,7 @@ final class TextCorrector: @unchecked Sendable {
         result = fixAcronymsAndTerms(result)
         result = fixCustomTerms(result)
         result = fixCapitalization(result)
+        result = removeRunawayRepetitions(result)
         result = fixPunctuation(result)
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
@@ -269,6 +270,76 @@ final class TextCorrector: @unchecked Sendable {
     }
 
     // MARK: - Pass 3: Punctuation Cleanup
+
+    private func removeRunawayRepetitions(_ text: String) -> String {
+        collapseRepeatedPhrases(in: collapseRepeatedSentences(in: text))
+    }
+
+    private func collapseRepeatedSentences(in text: String) -> String {
+        let pattern = #"[^.!?]+[.!?]?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let nsRange = NSRange(text.startIndex..., in: text)
+        let matches = regex.matches(in: text, range: nsRange)
+        guard matches.count > 1 else { return text }
+
+        var kept: [String] = []
+        var previousKey = ""
+        for match in matches {
+            guard let range = Range(match.range, in: text) else { continue }
+            let sentence = String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sentence.isEmpty else { continue }
+            let key = repetitionKey(sentence)
+            if key == previousKey, sentence.split(separator: " ").count >= 4 {
+                continue
+            }
+            kept.append(sentence)
+            previousKey = key
+        }
+
+        return kept.joined(separator: " ")
+    }
+
+    private func collapseRepeatedPhrases(in text: String) -> String {
+        var tokens = text.split(separator: " ").map(String.init)
+        guard tokens.count >= 8 else { return text }
+
+        var changed = true
+        while changed {
+            changed = false
+            let maxWindow = min(18, tokens.count / 2)
+            guard maxWindow >= 4 else { break }
+
+            for windowSize in stride(from: maxWindow, through: 4, by: -1) {
+                var index = 0
+                while index + (windowSize * 2) <= tokens.count {
+                    let first = tokens[index..<(index + windowSize)].map(repetitionTokenKey).joined(separator: " ")
+                    let second = tokens[(index + windowSize)..<(index + (windowSize * 2))].map(repetitionTokenKey).joined(separator: " ")
+                    if !first.isEmpty, first == second {
+                        tokens.removeSubrange((index + windowSize)..<(index + (windowSize * 2)))
+                        changed = true
+                    } else {
+                        index += 1
+                    }
+                }
+            }
+        }
+
+        return tokens.joined(separator: " ")
+    }
+
+    private func repetitionKey(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-zа-я0-9]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func repetitionTokenKey(_ token: String) -> String {
+        token
+            .lowercased()
+            .trimmingCharacters(in: .punctuationCharacters.union(.whitespacesAndNewlines))
+    }
 
     private func fixPunctuation(_ text: String) -> String {
         var result = text

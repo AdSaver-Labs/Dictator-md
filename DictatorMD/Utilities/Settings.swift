@@ -4,10 +4,51 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     static nonisolated(unsafe) let shared = AppSettings()
 
     private let defaults = UserDefaults.standard
+    private let seedCustomTerms = ["Openclaw", "Hermes"]
+
+    private init() {
+        ensureSeedCustomTerms()
+    }
 
     // MARK: - Hotkey Mode
 
     enum HotkeyMode: String { case pushToTalk, toggle }
+
+    enum AppearanceMode: String, CaseIterable, Identifiable {
+        case auto
+        case light
+        case dark
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .auto: "Auto"
+            case .light: "Light"
+            case .dark: "Dark"
+            }
+        }
+    }
+
+    enum DictationLanguage: String, CaseIterable, Identifiable {
+        case auto
+        case bulgarian = "bg"
+        case english = "en"
+
+        var id: String { rawValue }
+
+        var whisperCode: String {
+            rawValue
+        }
+
+        var label: String {
+            switch self {
+            case .auto: "Auto (English/Bulgarian)"
+            case .bulgarian: "Bulgarian"
+            case .english: "English"
+            }
+        }
+    }
 
     // MARK: - Keys
 
@@ -15,6 +56,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case hotkeyKeyCode
         case hotkeyMode
         case toggleHoldDuration
+        case dictationLanguage
         case selectedModel
         case soundFeedbackEnabled
         case vocabularyPrompt
@@ -24,6 +66,8 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case selectedAudioDeviceUID
         case numberConversionEnabled
         case customTerms
+        case floatingNodeEnabled
+        case appearanceMode
     }
 
     // MARK: - Properties
@@ -52,8 +96,16 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         }
     }
 
+    var dictationLanguage: DictationLanguage {
+        get {
+            let raw = defaults.string(forKey: Key.dictationLanguage.rawValue) ?? DictationLanguage.auto.rawValue
+            return DictationLanguage(rawValue: raw) ?? .auto
+        }
+        set { defaults.set(newValue.rawValue, forKey: Key.dictationLanguage.rawValue); objectWillChange.send() }
+    }
+
     var selectedModel: String {
-        get { defaults.string(forKey: Key.selectedModel.rawValue) ?? "small.en" }
+        get { defaults.string(forKey: Key.selectedModel.rawValue) ?? "small-q5_1" }
         set { defaults.set(newValue, forKey: Key.selectedModel.rawValue); objectWillChange.send() }
     }
 
@@ -94,6 +146,19 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         set { defaults.set(newValue, forKey: Key.customTerms.rawValue); objectWillChange.send() }
     }
 
+    var floatingNodeEnabled: Bool {
+        get { defaults.object(forKey: Key.floatingNodeEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.floatingNodeEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var appearanceMode: AppearanceMode {
+        get {
+            let raw = defaults.string(forKey: Key.appearanceMode.rawValue) ?? AppearanceMode.auto.rawValue
+            return AppearanceMode(rawValue: raw) ?? .auto
+        }
+        set { defaults.set(newValue.rawValue, forKey: Key.appearanceMode.rawValue); objectWillChange.send() }
+    }
+
     func addCustomTerm(_ term: String) {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -102,6 +167,18 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         if !terms.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
             terms.append(trimmed)
             customTerms = terms
+        }
+    }
+
+    private func ensureSeedCustomTerms() {
+        var terms = customTerms
+        var changed = false
+        for term in seedCustomTerms where !terms.contains(where: { $0.caseInsensitiveCompare(term) == .orderedSame }) {
+            terms.append(term)
+            changed = true
+        }
+        if changed {
+            defaults.set(terms, forKey: Key.customTerms.rawValue)
         }
     }
 
@@ -119,6 +196,11 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     // ~500 words — under whisper's 1024 token (~750 word) limit
     static let defaultVocabularyPrompt = """
+        Dictation should preserve the speaker's language. If the user speaks Bulgarian, output Bulgarian Cyrillic text.
+        Bulgarian dictation may include casual Sofia/business slang and mixed tech English: шорткът, хоткий, промпт,
+        агент, агенти, ап, апликация, сетинги, модел, локално, клауд, бекенд, фронтенд, деплой, репо, гит,
+        бранч, комит, пул рекуест, Notion, Codex, Wispr Flow, DictatorMD, OpenWhispr, FreeFlow. \
+        User/project terms: Openclaw, Hermes. \
         Technical software engineering discussion. \
         Languages: JavaScript, TypeScript, Python, Swift, SwiftUI, Rust, Go, Golang, \
         Java, Kotlin, C++, C#, F#, Ruby, PHP, Dart, Scala, Haskell, Elixir, Clojure, \
