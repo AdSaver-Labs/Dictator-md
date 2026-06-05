@@ -4,7 +4,10 @@ BUILD_DIR := build
 APP_NAME := Dictator-md
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
 SIGN_ID := Dictator-md Stable Local
+SIGN_CERT_SHA1 := 27fa31bc47861d4efe41f0f60e5f3a3fbdc6b1bc
 SIGN_KEYCHAIN := $(HOME)/Library/Keychains/DictatorMD-build.keychain-db
+SIGN_KEYCHAIN_PASSWORD := dictator-md
+ALLOW_ADHOC ?= 0
 
 # Build universal binary (arm64 + x86_64). The Swift binary is built once per
 # architecture and then merged with `lipo`. whisper.cpp's static libs are also
@@ -39,7 +42,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg
+.PHONY: all clean whisper model app run dmg install-local verify-signing
 
 all: whisper app
 
@@ -91,14 +94,36 @@ app: $(BUILD_DIR)/DictatorMD
 	@echo "APPL????" > "$(APP_BUNDLE)/Contents/PkgInfo"
 	@# Generate app icon
 	@python3 scripts/generate-icon.py "$(APP_BUNDLE)/Contents/Resources" 2>/dev/null || true
-	@# Use a stable local signing identity when available. Ad-hoc signatures
-	@# change identity every rebuild, which breaks macOS Accessibility grants.
+	@# Use stable signing by default. Ad-hoc signatures change app identity and
+	@# break macOS Accessibility grants, so they require ALLOW_ADHOC=1.
 	@if [ -f "$(SIGN_KEYCHAIN)" ]; then \
+		security unlock-keychain -p "$(SIGN_KEYCHAIN_PASSWORD)" "$(SIGN_KEYCHAIN)" >/dev/null; \
 		codesign --force --deep --keychain "$(SIGN_KEYCHAIN)" --sign "$(SIGN_ID)" "$(APP_BUNDLE)"; \
-	else \
+	elif [ "$(ALLOW_ADHOC)" = "1" ]; then \
+		echo "WARNING: using ad-hoc signing; Accessibility grants will not be stable."; \
 		codesign --force --deep --sign - "$(APP_BUNDLE)"; \
+	else \
+		echo "ERROR: missing stable signing keychain: $(SIGN_KEYCHAIN)"; \
+		echo "Refusing ad-hoc signing because it breaks Accessibility grants."; \
+		exit 1; \
 	fi
+	@$(MAKE) verify-signing
 	@echo "Built $(APP_BUNDLE)"
+
+verify-signing:
+	@codesign --verify --deep --strict "$(APP_BUNDLE)"
+	@if codesign -dv "$(APP_BUNDLE)" 2>&1 | grep -q 'flags=0x2(adhoc)'; then \
+		echo "ERROR: $(APP_BUNDLE) is ad-hoc signed. Refusing unstable build."; \
+		exit 1; \
+	fi
+	@codesign -d -r- "$(APP_BUNDLE)" 2>&1 | grep -q 'certificate leaf = H"$(SIGN_CERT_SHA1)"' || { \
+		echo "ERROR: $(APP_BUNDLE) is not signed with stable certificate $(SIGN_CERT_SHA1)."; \
+		codesign -dv "$(APP_BUNDLE)" 2>&1 | sed -n '1,80p'; \
+		exit 1; \
+	}
+
+install-local: app
+	./scripts/install-local.sh
 
 run: app
 	open "$(APP_BUNDLE)"

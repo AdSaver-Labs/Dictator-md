@@ -1848,6 +1848,8 @@ private struct ProtocolsSection: View {
                 CardHeader("Core Stability Protocol", subtitle: "The functional path that must stay intact before any design or feature work ships")
                 ProtocolChecklist(items: [
                     "Signing identity and bundle identifier must stay stable: Dictator-md Stable Local + com.dictatormd.DictatorMD.",
+                    "Local builds must fail rather than fall back to ad-hoc signing; ad-hoc signatures break macOS Accessibility grants.",
+                    "Install local builds only through make install-local so old DictatorMD/WhisperDictation app registrations are removed before launch.",
                     "Permission UI must reflect real runtime checks only: microphone uses AVCapture authorization; Accessibility uses AXIsProcessTrusted().",
                     "Hotkey capture must keep a working fallback: event tap when Accessibility is trusted, NSEvent fallback when it is not.",
                     "Recording must not start unless the local model is loaded and microphone access is authorized.",
