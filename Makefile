@@ -114,17 +114,17 @@ verify-signing:
 	@codesign --verify --deep --strict "$(APP_BUNDLE)"
 	@if [ "$(ALLOW_ADHOC)" = "1" ]; then \
 		echo "WARNING: skipping stable certificate verification for ad-hoc CI artifact."; \
-		exit 0; \
+	else \
+		if codesign -dv "$(APP_BUNDLE)" 2>&1 | grep -q 'flags=0x2(adhoc)'; then \
+			echo "ERROR: $(APP_BUNDLE) is ad-hoc signed. Refusing unstable build."; \
+			exit 1; \
+		fi; \
+		codesign -d -r- "$(APP_BUNDLE)" 2>&1 | grep -q 'certificate leaf = H"$(SIGN_CERT_SHA1)"' || { \
+			echo "ERROR: $(APP_BUNDLE) is not signed with stable certificate $(SIGN_CERT_SHA1)."; \
+			codesign -dv "$(APP_BUNDLE)" 2>&1 | sed -n '1,80p'; \
+			exit 1; \
+		}; \
 	fi
-	@if codesign -dv "$(APP_BUNDLE)" 2>&1 | grep -q 'flags=0x2(adhoc)'; then \
-		echo "ERROR: $(APP_BUNDLE) is ad-hoc signed. Refusing unstable build."; \
-		exit 1; \
-	fi
-	@codesign -d -r- "$(APP_BUNDLE)" 2>&1 | grep -q 'certificate leaf = H"$(SIGN_CERT_SHA1)"' || { \
-		echo "ERROR: $(APP_BUNDLE) is not signed with stable certificate $(SIGN_CERT_SHA1)."; \
-		codesign -dv "$(APP_BUNDLE)" 2>&1 | sed -n '1,80p'; \
-		exit 1; \
-	}
 
 install-local: app
 	./scripts/install-local.sh
