@@ -1,6 +1,6 @@
 # Dictator-md Windows Port Execution
 
-Status: not implemented yet. The macOS app is the working reference product.
+Status: native Windows prototype scaffold started. The macOS app is still the working reference product.
 
 The Windows version should not be a rushed rewrite. It should share product behavior with macOS while using native Windows APIs for the parts that must feel system-level.
 
@@ -87,6 +87,20 @@ Phase 4: Packaging
 
 ## Current Gap
 
-Windows is at planning/scaffolding stage. macOS is the only fully working app today.
+Windows now has a native CMake/Win32 tray scaffold under `apps/windows`.
 
-The immediate next engineering step is to create shared schemas and correction fixtures so Windows can match macOS behavior without copying Swift UI code.
+Implemented in the scaffold:
+- Hidden message window.
+- Tray icon and menu.
+- Prototype Right Alt hotkey registration.
+- Focus target capture at dictation start.
+- Clipboard plus `Ctrl+V` text insertion path.
+- GitHub Actions Windows build job.
+
+Not implemented yet:
+- WASAPI microphone capture.
+- whisper.cpp inference binding.
+- Real settings/history UI.
+- Installer, signing, and auto-start.
+
+The immediate next engineering step is to replace the prototype transcription string with WASAPI capture and local whisper.cpp inference, then test insertion in Notepad, browsers, chat boxes, and terminals.

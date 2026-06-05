@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dictator-md.local/schemas/settings.schema.json",
+  "title": "Dictator-md Settings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "language",
+    "selectedModel",
+    "hotkey",
+    "inputMode",
+    "appearanceMode",
+    "textProcessing"
+  ],
+  "properties": {
+    "language": {
+      "type": "string",
+      "enum": ["auto", "en", "bg"]
+    },
+    "selectedModel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hotkey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "platformCode"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1 },
+        "platformCode": { "type": "string", "minLength": 1 }
+      }
+    },
+    "inputMode": {
+      "type": "string",
+      "enum": ["hold", "toggle", "doublePressToggle"]
+    },
+    "appearanceMode": {
+      "type": "string",
+      "enum": ["system", "dark", "light"]
+    },
+    "soundFeedback": {
+      "type": "boolean",
+      "default": true
+    },
+    "floatingNodeEnabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "textProcessing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grammarCorrection",
+        "numberConversion",
+        "intonationFormatting",
+        "duplicateCollapse"
+      ],
+      "properties": {
+        "grammarCorrection": { "type": "boolean" },
+        "numberConversion": { "type": "boolean" },
+        "intonationFormatting": { "type": "boolean" },
+        "duplicateCollapse": { "type": "boolean" }
+      }
+    },
+    "customTerms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    }
+  }
+}

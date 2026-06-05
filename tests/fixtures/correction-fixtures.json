@@ -1,0 +1,43 @@
+{
+  "fixtures": [
+    {
+      "id": "en-custom-terms",
+      "language": "en",
+      "input": "open claw should talk to hermes",
+      "customTerms": ["Openclaw", "Hermes"],
+      "expected": "Openclaw should talk to Hermes."
+    },
+    {
+      "id": "en-duplicate-collapse",
+      "language": "en",
+      "input": "I want the app to paste the text I want the app to paste the text",
+      "customTerms": [],
+      "expected": "I want the app to paste the text."
+    },
+    {
+      "id": "en-intonation-question",
+      "language": "en",
+      "input": "can we make it faster",
+      "prosody": {
+        "pitchRise": true,
+        "longFinalPause": false
+      },
+      "expected": "Can we make it faster?"
+    },
+    {
+      "id": "bg-custom-terms",
+      "language": "bg",
+      "input": "искам open claw да говори с hermes",
+      "customTerms": ["Openclaw", "Hermes"],
+      "expected": "Искам Openclaw да говори с Hermes."
+    },
+    {
+      "id": "bg-no-russian-script",
+      "language": "bg",
+      "input": "искам диктовката да работи правилно",
+      "customTerms": [],
+      "forbiddenScripts": ["ru"],
+      "expected": "Искам диктовката да работи правилно."
+    }
+  ]
+}

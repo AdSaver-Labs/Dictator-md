@@ -20,7 +20,7 @@ jobs:
         run: ./scripts/build-whisper.sh
 
       - name: Build app
-        run: make app
+        run: make app ALLOW_ADHOC=1
 
       - name: Create DMG
         run: |
