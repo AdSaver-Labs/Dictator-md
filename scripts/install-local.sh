@@ -31,6 +31,15 @@ fi
 
 pkill -f "$EXECUTABLE" 2>/dev/null || true
 
+for bundle in \
+  com.sampop.WhisperDictation \
+  com.sam-pop.WhisperDictation \
+  com.dictatormd.WhisperDictation \
+  com.whisperdictation.WhisperDictation; do
+  tccutil reset Accessibility "$bundle" 2>/dev/null || true
+  tccutil reset Microphone "$bundle" 2>/dev/null || true
+done
+
 rm -rf /Applications/DictatorMD.app /Applications/WhisperDictation.app
 rm -rf "$HOME/Applications/DictatorMD.app" "$HOME/Applications/WhisperDictation.app"
 rm -rf "$DEST"
@@ -40,7 +49,12 @@ xattr -cr "$DEST"
 
 "$LSREGISTER" -u /Applications/DictatorMD.app 2>/dev/null || true
 "$LSREGISTER" -u /Applications/WhisperDictation.app 2>/dev/null || true
+"$LSREGISTER" -u "$ROOT/build/DictatorMD.app" 2>/dev/null || true
+"$LSREGISTER" -u "$ROOT/build/WhisperDictation.app" 2>/dev/null || true
+"$LSREGISTER" -u "$APP_BUNDLE" 2>/dev/null || true
 "$LSREGISTER" -f "$DEST"
+
+rm -rf "$ROOT/build/DictatorMD.app" "$ROOT/build/WhisperDictation.app" "$APP_BUNDLE"
 
 open -na "$DEST"
 sleep 6
