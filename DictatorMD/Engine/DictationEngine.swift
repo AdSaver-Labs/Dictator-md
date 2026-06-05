@@ -388,6 +388,10 @@ final class DictationEngine {
         let customTerms = AppSettings.shared.customTerms
         let learnedTerms = DictationMemory.shared.topPromptTerms(for: language)
         let voiceEnergy = Self.voiceEnergy(audioBuffer)
+        let prosody = AppSettings.shared.intonationFormattingEnabled ? ProsodyAnalyzer.analyze(audioBuffer) : nil
+        if let prosody {
+            DebugLog.shared.log("[DictationEngine] prosody \(prosody.debugSummary)")
+        }
         let prompt: String
         let allPromptTerms = Array((customTerms + learnedTerms).reduce(into: [String]()) { result, term in
             if !result.contains(where: { $0.caseInsensitiveCompare(term) == .orderedSame }) {
@@ -458,7 +462,7 @@ final class DictationEngine {
                 )
             }
 
-            let correctedText = TextCorrector.shared.correct(rawText)
+            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody)
             let fullText = Self.guardLanguageOutput(correctedText, language: language)
             fputs("[DictationEngine] Final text: \(fullText)\n", stderr)
             DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count) text=\"\(fullText)\"")

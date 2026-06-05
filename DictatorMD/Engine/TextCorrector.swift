@@ -10,7 +10,7 @@ final class TextCorrector: @unchecked Sendable {
     private var cachedRegex: NSRegularExpression?
     private var cachedLookup: [String: String] = [:]  // lowercased → original casing
 
-    func correct(_ text: String) -> String {
+    func correct(_ text: String, prosody: ProsodyFeatures? = nil) -> String {
         guard AppSettings.shared.grammarCorrectionEnabled else { return text }
         let startTime = CFAbsoluteTimeGetCurrent()
 
@@ -23,7 +23,7 @@ final class TextCorrector: @unchecked Sendable {
         result = fixCapitalization(result)
         result = removeRunawayRepetitions(result)
         if AppSettings.shared.intonationFormattingEnabled {
-            result = applyIntonationFormatting(result)
+            result = applyIntonationFormatting(result, prosody: prosody)
         }
         result = fixPunctuation(result)
 
@@ -332,12 +332,12 @@ final class TextCorrector: @unchecked Sendable {
 
     // MARK: - Pass 2.8: Intonation-Aware Formatting
 
-    private func applyIntonationFormatting(_ text: String) -> String {
+    private func applyIntonationFormatting(_ text: String, prosody: ProsodyFeatures?) -> String {
         var result = text
 
         result = replaceSpokenPunctuation(in: result)
-        result = markQuestionLikeSentences(in: result)
-        result = markEmphasisLikeSentences(in: result)
+        result = markQuestionLikeSentences(in: result, prosody: prosody)
+        result = markEmphasisLikeSentences(in: result, prosody: prosody)
         result = normalizeParagraphBreaks(in: result)
 
         return result
@@ -370,7 +370,7 @@ final class TextCorrector: @unchecked Sendable {
             .replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
     }
 
-    private func markQuestionLikeSentences(in text: String) -> String {
+    private func markQuestionLikeSentences(in text: String, prosody: ProsodyFeatures?) -> String {
         let pattern = #"(^|[.!?]\s+)([^.!?\n][^.!?\n]{8,180})"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
         var result = text
@@ -380,14 +380,14 @@ final class TextCorrector: @unchecked Sendable {
             guard match.numberOfRanges >= 3,
                   let sentenceRange = Range(match.range(at: 2), in: result) else { continue }
             let sentence = String(result[sentenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard isQuestionLike(sentence), !sentence.hasSuffix("?") else { continue }
+            guard shouldApplyQuestionMark(to: sentence, prosody: prosody), !sentence.hasSuffix("?") else { continue }
             result.replaceSubrange(sentenceRange, with: sentence.trimmingCharacters(in: .punctuationCharacters) + "?")
         }
 
         return result
     }
 
-    private func markEmphasisLikeSentences(in text: String) -> String {
+    private func markEmphasisLikeSentences(in text: String, prosody: ProsodyFeatures?) -> String {
         let pattern = #"(^|[.!?]\s+)([^.!?\n][^.!?\n]{8,160})"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
         var result = text
@@ -397,7 +397,7 @@ final class TextCorrector: @unchecked Sendable {
             guard match.numberOfRanges >= 3,
                   let sentenceRange = Range(match.range(at: 2), in: result) else { continue }
             let sentence = String(result[sentenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard isEmphasisLike(sentence), !sentence.hasSuffix("!"), !sentence.hasSuffix("?") else { continue }
+            guard shouldApplyExclamationMark(to: sentence, prosody: prosody), !sentence.hasSuffix("!"), !sentence.hasSuffix("?") else { continue }
             result.replaceSubrange(sentenceRange, with: sentence.trimmingCharacters(in: .punctuationCharacters) + "!")
         }
 
@@ -422,6 +422,21 @@ final class TextCorrector: @unchecked Sendable {
         }
     }
 
+    private func shouldApplyQuestionMark(to sentence: String, prosody: ProsodyFeatures?) -> Bool {
+        if isQuestionLike(sentence) { return true }
+
+        guard let prosody,
+              prosody.endingPitchRise,
+              prosody.duration <= 8.0,
+              wordCount(sentence) <= 18,
+              !sentence.contains(","),
+              !sentence.contains(";") else {
+            return false
+        }
+
+        return true
+    }
+
     private func isEmphasisLike(_ sentence: String) -> Bool {
         let lower = sentence.lowercased()
         let emphasisMarkers = [
@@ -429,6 +444,24 @@ final class TextCorrector: @unchecked Sendable {
             "това е страхотно", "това е перфектно", "това е ужасно", "обожавам", "мразя", "супер е"
         ]
         return emphasisMarkers.contains { lower.contains($0) }
+    }
+
+    private func shouldApplyExclamationMark(to sentence: String, prosody: ProsodyFeatures?) -> Bool {
+        if isEmphasisLike(sentence) { return true }
+
+        guard let prosody,
+              prosody.emphasizedEnding,
+              prosody.duration <= 6.0,
+              wordCount(sentence) <= 12,
+              !isQuestionLike(sentence) else {
+            return false
+        }
+
+        return true
+    }
+
+    private func wordCount(_ text: String) -> Int {
+        text.split { $0.isWhitespace || $0.isNewline }.count
     }
 
     private func repetitionKey(_ text: String) -> String {

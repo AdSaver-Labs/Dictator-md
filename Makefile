@@ -21,6 +21,7 @@ SWIFT_FILES := \
 	DictatorMD/Engine/TextInjector.swift \
 	DictatorMD/Engine/SoundFeedback.swift \
 	DictatorMD/Engine/ModelManager.swift \
+	DictatorMD/Engine/ProsodyAnalyzer.swift \
 	DictatorMD/Engine/TextCorrector.swift \
 	DictatorMD/Utilities/HotkeyMonitor.swift \
 	DictatorMD/Utilities/PermissionManager.swift \

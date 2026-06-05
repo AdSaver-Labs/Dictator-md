@@ -156,12 +156,13 @@ Current implementation:
 - Handles spoken punctuation commands.
 - Adds question marks to question-like English/Bulgarian phrases.
 - Adds exclamation marks to clear emphasis phrases.
+- Analyzes raw audio for speech ratio, pauses, ending pitch rise, and emphasized endings.
+- Uses pitch/emphasis signals conservatively on short utterances only.
 
 Next implementation:
-- Extract pause lengths from the audio stream.
+- Align pause lengths with transcript segments once word/segment timestamps are available.
 - Use silence duration for comma, sentence break, and paragraph break decisions.
-- Add pitch contour detection for likely questions.
-- Add energy/speed analysis for emphasis.
+- Add per-user calibration so quiet speakers and whispering are handled better.
 - Keep this as a formatter, not an emotional classifier.
 
 Quality gate:
