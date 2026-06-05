@@ -607,6 +607,25 @@ private struct DashboardTermRow: View {
     }
 }
 
+private struct FeaturePill: View {
+    let icon: String
+    let text: String
+    let color: Color
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(color.opacity(colorScheme == .dark ? 0.16 : 0.22))
+            )
+            .foregroundStyle(colorScheme == .dark ? color : AppTheme.ink)
+    }
+}
+
 private struct CompactHistoryRow: View {
     let item: DictationHistoryItem
     let colorScheme: ColorScheme
@@ -732,6 +751,40 @@ private struct GeneralSection: View {
             }
 
             SettingsCard(colorScheme: colorScheme) {
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(LinearGradient(colors: [AppTheme.logoYellow, AppTheme.cyan.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(AppTheme.ink)
+                    }
+                    .frame(width: 40, height: 40)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .center) {
+                            CardHeader("Voice Intelligence", subtitle: "Experimental speech-aware punctuation")
+                            Spacer()
+                            Toggle("", isOn: $settings.intonationFormattingEnabled)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+
+                        Text("Uses spoken punctuation commands plus short-phrase audio cues like pitch rise and emphasis. Keep it off for strict raw dictation; turn it on to test more natural question and emphasis punctuation.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 8) {
+                            FeaturePill(icon: "questionmark.circle.fill", text: "questions", color: AppTheme.cyan, colorScheme: colorScheme)
+                            FeaturePill(icon: "exclamationmark.circle.fill", text: "emphasis", color: AppTheme.logoYellow, colorScheme: colorScheme)
+                            FeaturePill(icon: "text.alignleft", text: "spoken punctuation", color: AppTheme.readyGreen, colorScheme: colorScheme)
+                        }
+                    }
+                }
+            }
+
+            SettingsCard(colorScheme: colorScheme) {
                 CardHeader("Preferences")
                 HStack {
                     Label("Appearance", systemImage: "circle.lefthalf.filled")
@@ -755,9 +808,6 @@ private struct GeneralSection: View {
                     .font(.system(size: 13))
                 Toggle("Convert number words to digits", isOn: $settings.numberConversionEnabled)
                     .font(.system(size: 13))
-                Toggle("Intonation-aware punctuation", isOn: $settings.intonationFormattingEnabled)
-                    .font(.system(size: 13))
-                    .help("Experimental: uses spoken punctuation cues and phrase shape to make dictation feel closer to natural speech.")
                 Toggle("Sound feedback", isOn: $settings.soundFeedbackEnabled)
                     .font(.system(size: 13))
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)

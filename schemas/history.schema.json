@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dictatormd.app/schemas/history.schema.json",
+  "title": "Dictator-md History",
+  "type": "object",
+  "required": ["version", "items", "learnedTerms"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/historyItem"
+      }
+    },
+    "learnedTerms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/learnedTerm"
+      }
+    }
+  },
+  "$defs": {
+    "historyItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "timestamp",
+        "text",
+        "language",
+        "appName",
+        "bundleIdentifier",
+        "audioDuration",
+        "wordCount"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "text": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["auto", "en", "bg"]
+        },
+        "appName": {
+          "type": "string"
+        },
+        "bundleIdentifier": {
+          "type": "string"
+        },
+        "audioDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wordCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "learnedTerm": {
+      "type": "object",
+      "required": ["term", "language", "count", "lastSeen"],
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "enum": ["auto", "en", "bg"]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "firstSeen": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
