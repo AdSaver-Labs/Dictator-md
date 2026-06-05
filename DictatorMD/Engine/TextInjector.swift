@@ -19,8 +19,11 @@ final class TextInjector {
         typingQueue.sync {
             restoreTargetIfNeeded(target)
             if !AXIsProcessTrusted() {
-                DebugLog.shared.log("[TextInjector] AX not trusted; using direct unicode typing fallback")
-                putOnClipboard(text: prepared)
+                DebugLog.shared.log("[TextInjector] AX not trusted; trying clipboard paste fallback")
+                if pasteWithClipboard(text: prepared) {
+                    return
+                }
+                DebugLog.shared.log("[TextInjector] AX clipboard paste failed; using direct unicode typing fallback")
                 typeUnicode(text: prepared)
                 return
             }
