@@ -112,6 +112,10 @@ app: $(BUILD_DIR)/DictatorMD
 
 verify-signing:
 	@codesign --verify --deep --strict "$(APP_BUNDLE)"
+	@if [ "$(ALLOW_ADHOC)" = "1" ]; then \
+		echo "WARNING: skipping stable certificate verification for ad-hoc CI artifact."; \
+		exit 0; \
+	fi
 	@if codesign -dv "$(APP_BUNDLE)" 2>&1 | grep -q 'flags=0x2(adhoc)'; then \
 		echo "ERROR: $(APP_BUNDLE) is ad-hoc signed. Refusing unstable build."; \
 		exit 1; \
