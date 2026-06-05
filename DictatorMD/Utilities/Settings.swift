@@ -68,6 +68,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case customTerms
         case floatingNodeEnabled
         case appearanceMode
+        case intonationFormattingEnabled
     }
 
     // MARK: - Properties
@@ -157,6 +158,11 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
             return AppearanceMode(rawValue: raw) ?? .auto
         }
         set { defaults.set(newValue.rawValue, forKey: Key.appearanceMode.rawValue); objectWillChange.send() }
+    }
+
+    var intonationFormattingEnabled: Bool {
+        get { defaults.object(forKey: Key.intonationFormattingEnabled.rawValue) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: Key.intonationFormattingEnabled.rawValue); objectWillChange.send() }
     }
 
     func addCustomTerm(_ term: String) {

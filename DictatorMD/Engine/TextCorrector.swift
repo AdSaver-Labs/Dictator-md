@@ -22,6 +22,9 @@ final class TextCorrector: @unchecked Sendable {
         result = fixCustomTerms(result)
         result = fixCapitalization(result)
         result = removeRunawayRepetitions(result)
+        if AppSettings.shared.intonationFormattingEnabled {
+            result = applyIntonationFormatting(result)
+        }
         result = fixPunctuation(result)
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
@@ -325,6 +328,107 @@ final class TextCorrector: @unchecked Sendable {
         }
 
         return tokens.joined(separator: " ")
+    }
+
+    // MARK: - Pass 2.8: Intonation-Aware Formatting
+
+    private func applyIntonationFormatting(_ text: String) -> String {
+        var result = text
+
+        result = replaceSpokenPunctuation(in: result)
+        result = markQuestionLikeSentences(in: result)
+        result = markEmphasisLikeSentences(in: result)
+        result = normalizeParagraphBreaks(in: result)
+
+        return result
+    }
+
+    private func replaceSpokenPunctuation(in text: String) -> String {
+        var result = text
+        let replacements: [(String, String)] = [
+            (#"\b(new paragraph|next paragraph|нова алинея|нов параграф)\b"#, "\n\n"),
+            (#"\b(new line|next line|нов ред)\b"#, "\n"),
+            (#"\b(question mark|въпросителен знак)\b"#, "?"),
+            (#"\b(exclamation mark|удивителен знак)\b"#, "!"),
+            (#"\b(comma|запетая)\b"#, ","),
+            (#"\b(period|full stop|точка)\b"#, "."),
+            (#"\b(colon|две точки)\b"#, ":"),
+            (#"\b(semicolon|точка и запетая)\b"#, ";")
+        ]
+
+        for (pattern, replacement) in replacements {
+            result = result.replacingOccurrences(
+                of: pattern,
+                with: replacement,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+
+        return result
+            .replacingOccurrences(of: #"\s+([,.!?;:])"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"([,.!?;:])(?=\S)"#, with: "$1 ", options: .regularExpression)
+            .replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
+    }
+
+    private func markQuestionLikeSentences(in text: String) -> String {
+        let pattern = #"(^|[.!?]\s+)([^.!?\n][^.!?\n]{8,180})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
+        var result = text
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+
+        for match in matches.reversed() {
+            guard match.numberOfRanges >= 3,
+                  let sentenceRange = Range(match.range(at: 2), in: result) else { continue }
+            let sentence = String(result[sentenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isQuestionLike(sentence), !sentence.hasSuffix("?") else { continue }
+            result.replaceSubrange(sentenceRange, with: sentence.trimmingCharacters(in: .punctuationCharacters) + "?")
+        }
+
+        return result
+    }
+
+    private func markEmphasisLikeSentences(in text: String) -> String {
+        let pattern = #"(^|[.!?]\s+)([^.!?\n][^.!?\n]{8,160})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return text }
+        var result = text
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+
+        for match in matches.reversed() {
+            guard match.numberOfRanges >= 3,
+                  let sentenceRange = Range(match.range(at: 2), in: result) else { continue }
+            let sentence = String(result[sentenceRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard isEmphasisLike(sentence), !sentence.hasSuffix("!"), !sentence.hasSuffix("?") else { continue }
+            result.replaceSubrange(sentenceRange, with: sentence.trimmingCharacters(in: .punctuationCharacters) + "!")
+        }
+
+        return result
+    }
+
+    private func normalizeParagraphBreaks(in text: String) -> String {
+        text
+            .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+            .replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isQuestionLike(_ sentence: String) -> Bool {
+        let lower = sentence.lowercased()
+        let questionStarts = [
+            "who", "what", "when", "where", "why", "how", "can", "could", "should", "would", "is", "are", "do", "does", "did",
+            "кой", "коя", "кое", "кои", "как", "кога", "къде", "защо", "дали", "може ли", "трябва ли", "има ли"
+        ]
+        return questionStarts.contains { marker in
+            lower == marker || lower.hasPrefix(marker + " ")
+        }
+    }
+
+    private func isEmphasisLike(_ sentence: String) -> Bool {
+        let lower = sentence.lowercased()
+        let emphasisMarkers = [
+            "this is amazing", "this is perfect", "this is terrible", "this is insane", "i love this", "i hate this",
+            "това е страхотно", "това е перфектно", "това е ужасно", "обожавам", "мразя", "супер е"
+        ]
+        return emphasisMarkers.contains { lower.contains($0) }
     }
 
     private func repetitionKey(_ text: String) -> String {

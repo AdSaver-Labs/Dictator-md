@@ -3,7 +3,7 @@ MIN_MACOS := 14.0
 BUILD_DIR := build
 APP_NAME := Dictator-md
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
-SIGN_ID := FCA6AD26A0B947CD74A78370D623FCDDADFDD4A6
+SIGN_ID := Dictator-md Stable Local
 SIGN_KEYCHAIN := $(HOME)/Library/Keychains/DictatorMD-build.keychain-db
 
 # Build universal binary (arm64 + x86_64). The Swift binary is built once per
