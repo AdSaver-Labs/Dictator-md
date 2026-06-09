@@ -25,6 +25,27 @@ func roundedPath(_ rect: CGRect, _ radius: CGFloat) -> CGPath {
     CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
 }
 
+func sparklePath(center: CGPoint, radius: CGFloat) -> CGPath {
+    let path = CGMutablePath()
+    let short = radius * 0.34
+    let points = [
+        CGPoint(x: center.x, y: center.y - radius),
+        CGPoint(x: center.x + short, y: center.y - short),
+        CGPoint(x: center.x + radius, y: center.y),
+        CGPoint(x: center.x + short, y: center.y + short),
+        CGPoint(x: center.x, y: center.y + radius),
+        CGPoint(x: center.x - short, y: center.y + short),
+        CGPoint(x: center.x - radius, y: center.y),
+        CGPoint(x: center.x - short, y: center.y - short),
+    ]
+    path.move(to: points[0])
+    for point in points.dropFirst() {
+        path.addLine(to: point)
+    }
+    path.closeSubpath()
+    return path
+}
+
 func renderIcon(size: Int) -> NSImage {
     let img = NSImage(size: NSSize(width: size, height: size))
     img.lockFocus()
@@ -85,10 +106,24 @@ func renderIcon(size: Int) -> NSImage {
         )
         NSGraphicsContext.saveGraphicsState()
         NSColor(cgColor: ink)?.set()
+        let transform = NSAffineTransform()
+        transform.translateX(by: symbolRect.midX, yBy: symbolRect.midY)
+        transform.rotate(byDegrees: -7)
+        transform.translateX(by: -symbolRect.midX, yBy: -symbolRect.midY)
+        transform.concat()
         symbol.isTemplate = true
         symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1.0)
         NSGraphicsContext.restoreGraphicsState()
     }
+
+    ctx.setFillColor(ink)
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.27, y: tile.minY + tile.height * 0.30), radius: tile.width * 0.045))
+    ctx.fillPath()
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.73, y: tile.minY + tile.height * 0.25), radius: tile.width * 0.068))
+    ctx.fillPath()
+    ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.82))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.77, y: tile.minY + tile.height * 0.74), radius: tile.width * 0.04))
+    ctx.fillPath()
 
     img.unlockFocus()
     return img

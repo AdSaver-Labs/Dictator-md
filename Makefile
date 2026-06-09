@@ -32,6 +32,7 @@ SWIFT_FILES := \
 	DictatorMD/Utilities/AudioDeviceManager.swift \
 	DictatorMD/Utilities/FocusTracker.swift \
 	DictatorMD/Engine/DictationEngine.swift \
+	DictatorMD/UI/BrandViews.swift \
 	DictatorMD/UI/MenuBarView.swift \
 	DictatorMD/UI/FloatingNodeView.swift \
 	DictatorMD/UI/SettingsWindowController.swift \

@@ -45,6 +45,8 @@ struct SettingsView: View {
     @ObservedObject private var permissions = PermissionManager.shared
     @ObservedObject private var memory = DictationMemory.shared
     @State private var selectedSection: SettingsSection = .dashboard
+    @State private var showOnboarding = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.colorScheme) private var colorScheme
 
     enum SettingsSection: String, CaseIterable, Identifiable {
@@ -72,22 +74,54 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            detailPane
+        ZStack {
+            premiumBackground
+
+            HStack(spacing: 0) {
+                sidebar
+                Divider()
+                    .opacity(colorScheme == .dark ? 0.28 : 0.42)
+                detailPane
+            }
         }
-        .frame(minWidth: 760, idealWidth: 820, minHeight: 540, idealHeight: 600)
-        .background(
+        .frame(minWidth: 920, idealWidth: 1040, minHeight: 660, idealHeight: 720)
+        .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(isPresented: $showOnboarding)
+                .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+        }
+        .onAppear {
+            if !hasCompletedOnboarding {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    showOnboarding = true
+                }
+            }
+        }
+    }
+
+    private var premiumBackground: some View {
+        ZStack {
             LinearGradient(
                 colors: colorScheme == .dark
-                    ? [Color(.windowBackgroundColor), AppTheme.ink.opacity(0.32)]
-                    : [Color(red: 1.0, green: 0.96, blue: 0.84).opacity(0.58), Color(.controlBackgroundColor).opacity(0.28)],
+                    ? [Color(red: 0.055, green: 0.06, blue: 0.068), Color(red: 0.10, green: 0.105, blue: 0.115)]
+                    : [Color(red: 1.0, green: 0.975, blue: 0.90), Color(red: 0.94, green: 0.955, blue: 0.965)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        )
-        .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
+
+            Circle()
+                .fill(AppTheme.logoYellow.opacity(colorScheme == .dark ? 0.16 : 0.22))
+                .blur(radius: 70)
+                .frame(width: 300, height: 300)
+                .offset(x: -310, y: -260)
+
+            Circle()
+                .fill(AppTheme.cyan.opacity(colorScheme == .dark ? 0.12 : 0.18))
+                .blur(radius: 80)
+                .frame(width: 360, height: 360)
+                .offset(x: 370, y: 260)
+        }
+        .ignoresSafeArea()
     }
 
     // MARK: - Sidebar
@@ -95,18 +129,7 @@ struct SettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(AppTheme.brandGradient)
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(AppTheme.ink)
-                }
-                .frame(width: 32, height: 32)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9)
-                        .stroke(AppTheme.ink.opacity(colorScheme == .dark ? 0.22 : 0.12), lineWidth: 1)
-                )
+                DictatorLogoMark(size: 34)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Dictator-md")
@@ -139,6 +162,24 @@ struct SettingsView: View {
 
             Spacer()
 
+            Button {
+                showOnboarding = true
+            } label: {
+                Label("Setup Guide", systemImage: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(colorScheme == .dark ? AppTheme.logoYellowSoft : AppTheme.ink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppTheme.logoYellow.opacity(colorScheme == .dark ? 0.13 : 0.22))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
             HStack(spacing: 6) {
                 Circle()
                     .fill(engine.isModelLoaded ? AppTheme.readyGreen : .orange)
@@ -154,11 +195,11 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .frame(width: 170)
+        .frame(width: 188)
         .background(
             colorScheme == .dark
-                ? AppTheme.ink.opacity(0.22)
-                : Color(red: 1.0, green: 0.98, blue: 0.90).opacity(0.82)
+                ? Color.black.opacity(0.20)
+                : Color.white.opacity(0.50)
         )
     }
 
@@ -167,15 +208,28 @@ struct SettingsView: View {
     private var detailPane: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(selectedSection.rawValue)
-                    .font(.system(size: 20, weight: .bold))
-                    .overlay(alignment: .bottomLeading) {
-                        Capsule()
-                            .fill(AppTheme.brandGradient)
-                            .frame(width: 36, height: 3)
-                            .offset(y: 8)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(selectedSection.rawValue)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                        Text(sectionSubtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.bottom, 16)
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(engine.state == .recording ? .red : (engine.isModelLoaded ? AppTheme.readyGreen : .orange))
+                            .frame(width: 8, height: 8)
+                        Text(engine.state == .idle ? (engine.isModelLoaded ? "Ready" : "Loading") : engine.state.rawValue.capitalized)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(colorScheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.70)))
+                }
+                .padding(.bottom, 18)
 
                 switch selectedSection {
                 case .dashboard:
@@ -197,6 +251,18 @@ struct SettingsView: View {
             .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var sectionSubtitle: String {
+        switch selectedSection {
+        case .dashboard: "Live stats, local memory, and dictation health."
+        case .general: "Hotkey, language, microphone, and AI voice intelligence."
+        case .model: "Offline transcription engines and performance controls."
+        case .history: "Searchable dictation history and activity over time."
+        case .vocabulary: "Self-learning terms and custom project language."
+        case .protocols: "Core reliability rules for future development."
+        case .permissions: "System access diagnostics for microphone and typing."
+        }
     }
 }
 
@@ -231,7 +297,7 @@ private struct SidebarRow: View {
         .background(
             isSelected
                 ? RoundedRectangle(cornerRadius: 8)
-                    .fill(colorScheme == .dark ? AppTheme.logoYellow.opacity(0.11) : AppTheme.logoYellow.opacity(0.18))
+                    .fill(colorScheme == .dark ? AppTheme.logoYellow.opacity(0.13) : AppTheme.logoYellow.opacity(0.22))
                 : nil
         )
         .padding(.horizontal, 8)
@@ -253,13 +319,13 @@ private struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.92))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.055), radius: 2, y: 1)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.065) : Color.white.opacity(0.72))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.05), radius: 12, y: 8)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(
-                    colorScheme == .dark ? AppTheme.logoYellow.opacity(0.10) : AppTheme.logoYellow.opacity(0.22),
+                    colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72),
                     lineWidth: 0.7
                 )
         )
@@ -302,18 +368,7 @@ private struct DashboardSection: View {
         VStack(spacing: 14) {
             SettingsCard(colorScheme: colorScheme) {
                 HStack(alignment: .center, spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(AppTheme.brandGradient)
-                        Image(systemName: engine.state == .recording ? "waveform" : "mic.fill")
-                            .font(.system(size: 25, weight: .bold))
-                            .foregroundStyle(AppTheme.ink)
-                    }
-                    .frame(width: 58, height: 58)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.ink.opacity(colorScheme == .dark ? 0.22 : 0.14), lineWidth: 1)
-                    )
+                    DictatorLogoMark(size: 58)
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(statusTitle)
@@ -346,6 +401,19 @@ private struct DashboardSection: View {
             SettingsCard(colorScheme: colorScheme) {
                 CardHeader("Weekly Activity", subtitle: "Current calendar week")
                 WeeklyWordBars(days: weeklyBuckets, colorScheme: colorScheme)
+            }
+
+            SettingsCard(colorScheme: colorScheme) {
+                HStack(alignment: .center, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        CardHeader("Floating Node", subtitle: "Compact overlay concept for any typing surface")
+                        Text("A thin status line expands into language, microphone, and app controls only when you need it.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    FloatingNodePreview(language: settings.dictationLanguage, colorScheme: colorScheme)
+                }
             }
 
             HStack(alignment: .top, spacing: 14) {
@@ -436,6 +504,64 @@ private struct DashboardSection: View {
         let totalSeconds = items.reduce(0.0) { $0 + $1.audioDuration }
         guard totalWords > 0, totalSeconds > 0 else { return 0 }
         return Int((Double(totalWords) / totalSeconds * 60).rounded())
+    }
+}
+
+private struct FloatingNodePreview: View {
+    let language: AppSettings.DictationLanguage
+    let colorScheme: ColorScheme
+    @State private var pulse = false
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Capsule()
+                .fill(AppTheme.readyGreen)
+                .frame(width: 34, height: 5)
+                .opacity(pulse ? 0.55 : 1.0)
+
+            Text(shortLanguage)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(colorScheme == .dark ? AppTheme.logoYellowSoft : AppTheme.ink)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(AppTheme.logoYellow.opacity(colorScheme == .dark ? 0.15 : 0.28)))
+
+            Image(systemName: "mic.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(AppTheme.ink)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(AppTheme.logoYellow))
+
+            Image(systemName: "arrow.up.forward.app.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(colorScheme == .dark ? Color.white.opacity(0.07) : Color.black.opacity(0.04)))
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(colorScheme == .dark ? Color.black.opacity(0.34) : Color.white.opacity(0.78))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.26 : 0.10), radius: 16, y: 8)
+        )
+        .overlay(
+            Capsule()
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.85), lineWidth: 1)
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
+    }
+
+    private var shortLanguage: String {
+        switch language {
+        case .auto: "AUTO"
+        case .english: "EN"
+        case .bulgarian: "BG"
+        }
     }
 }
 
