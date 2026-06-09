@@ -365,79 +365,79 @@ private struct DashboardSection: View {
     private var calendar: Calendar { .current }
 
     var body: some View {
-        VStack(spacing: 14) {
-            SettingsCard(colorScheme: colorScheme) {
-                HStack(alignment: .center, spacing: 14) {
-                    DictatorLogoMark(size: 58)
+        VStack(spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                DashboardHeroCard(
+                    statusTitle: statusTitle,
+                    state: engine.state,
+                    wordsToday: wordsToday,
+                    averageWPM: averageWPMThisWeek,
+                    colorScheme: colorScheme
+                )
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(statusTitle)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                        Text("Local dictation, local memory, no cloud required.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Label(settings.dictationLanguage.label, systemImage: "globe.europe.africa.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Label(engine.isModelLoaded ? "Model ready" : "Loading model", systemImage: engine.isModelLoaded ? "checkmark.circle.fill" : "clock.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(engine.isModelLoaded ? AppTheme.readyGreen : .orange)
-                    }
+                VStack(spacing: 14) {
+                    DashboardStatusPanel(
+                        title: "Language Mode",
+                        value: shortLanguageLabel,
+                        subtitle: settings.dictationLanguage.label,
+                        icon: "globe.europe.africa.fill",
+                        tint: AppTheme.cyan,
+                        colorScheme: colorScheme
+                    )
+                    DashboardStatusPanel(
+                        title: "Local Engine",
+                        value: engine.isModelLoaded ? "Ready" : "Loading",
+                        subtitle: settings.selectedModel,
+                        icon: "brain.head.profile.fill",
+                        tint: engine.isModelLoaded ? AppTheme.readyGreen : .orange,
+                        colorScheme: colorScheme
+                    )
+                    DashboardFloatingNodeCard(language: settings.dictationLanguage, colorScheme: colorScheme)
                 }
+                .frame(width: 250)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                DashboardMetricCard(title: "Today", value: "\(wordsToday)", subtitle: "words dictated", icon: "sun.max.fill", color: AppTheme.logoYellow, colorScheme: colorScheme)
-                DashboardMetricCard(title: "This Week", value: "\(wordsThisWeek)", subtitle: "words dictated", icon: "calendar", color: AppTheme.cyan, colorScheme: colorScheme)
-                DashboardMetricCard(title: "Avg Speed", value: "\(averageWPMThisWeek)", subtitle: "wpm this week", icon: "speedometer", color: Color(red: 0.95, green: 0.46, blue: 0.14), colorScheme: colorScheme)
-                DashboardMetricCard(title: "New Terms", value: "\(newTermsThisWeek)", subtitle: "\(newTermsToday) today", icon: "sparkles", color: AppTheme.readyGreen, colorScheme: colorScheme)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                DashboardMetricCard(title: "Today's Words", value: "\(wordsToday)", subtitle: "dictated today", icon: "quote.bubble.fill", color: AppTheme.logoYellow, colorScheme: colorScheme)
+                DashboardMetricCard(title: "Weekly Words", value: "\(wordsThisWeek)", subtitle: "current calendar week", icon: "calendar", color: AppTheme.cyan, colorScheme: colorScheme)
+                DashboardMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", subtitle: "speech speed", icon: "speedometer", color: Color(red: 0.95, green: 0.46, blue: 0.14), colorScheme: colorScheme)
+                DashboardMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", subtitle: "\(newTermsToday) today", icon: "sparkles", color: AppTheme.readyGreen, colorScheme: colorScheme)
             }
 
             SettingsCard(colorScheme: colorScheme) {
-                CardHeader("Weekly Activity", subtitle: "Current calendar week")
+                HStack(alignment: .center) {
+                    CardHeader("Weekly Activity", subtitle: "Current calendar week")
+                    Spacer()
+                    Text("\(weeklyDictations) dictations")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
                 WeeklyWordBars(days: weeklyBuckets, colorScheme: colorScheme)
-            }
-
-            SettingsCard(colorScheme: colorScheme) {
-                HStack(alignment: .center, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        CardHeader("Floating Node", subtitle: "Compact overlay concept for any typing surface")
-                        Text("A thin status line expands into language, microphone, and app controls only when you need it.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    FloatingNodePreview(language: settings.dictationLanguage, colorScheme: colorScheme)
-                }
             }
 
             HStack(alignment: .top, spacing: 14) {
                 SettingsCard(colorScheme: colorScheme) {
-                    CardHeader("Recently Learned", subtitle: "Used to adapt future recognition")
-                    if recentLearnedTerms.isEmpty {
-                        EmptyStateLine(icon: "sparkles", text: "New project terms will appear here as you dictate.")
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(recentLearnedTerms) { term in
-                                DashboardTermRow(term: term)
-                            }
-                        }
-                    }
-                }
-
-                SettingsCard(colorScheme: colorScheme) {
-                    CardHeader("Recent Dictations", subtitle: "Last successful local captures")
+                    CardHeader("Recent Dictations", subtitle: "Last local captures")
                     if memory.history.isEmpty {
                         EmptyStateLine(icon: "text.bubble", text: "Your recent dictations will show here.")
                     } else {
                         VStack(spacing: 8) {
                             ForEach(memory.history.prefix(4)) { item in
                                 CompactHistoryRow(item: item, colorScheme: colorScheme)
+                            }
+                        }
+                    }
+                }
+
+                SettingsCard(colorScheme: colorScheme) {
+                    CardHeader("Self-Learning Vocabulary", subtitle: "Terms adapted from your usage")
+                    if recentLearnedTerms.isEmpty {
+                        EmptyStateLine(icon: "sparkles", text: "New project terms will appear here as you dictate.")
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(recentLearnedTerms) { term in
+                                DashboardTermRow(term: term)
                             }
                         }
                     }
@@ -486,6 +486,18 @@ private struct DashboardSection: View {
     private var weeklyBuckets: [DailyWordBucket] {
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date())
         return dailyBuckets(startingAt: weekStart, endingAt: Date(), calendar: calendar, history: memory.history)
+    }
+
+    private var weeklyDictations: Int {
+        weeklyBuckets.reduce(0) { $0 + $1.dictations }
+    }
+
+    private var shortLanguageLabel: String {
+        switch settings.dictationLanguage {
+        case .auto: return "Auto"
+        case .english: return "EN"
+        case .bulgarian: return "BG"
+        }
     }
 
     private func words(since start: Date) -> Int {
@@ -561,6 +573,204 @@ private struct FloatingNodePreview: View {
         case .auto: "AUTO"
         case .english: "EN"
         case .bulgarian: "BG"
+        }
+    }
+}
+
+private struct DashboardHeroCard: View {
+    let statusTitle: String
+    let state: DictationState
+    let wordsToday: Int
+    let averageWPM: Int
+    let colorScheme: ColorScheme
+    @State private var shimmer = false
+
+    var body: some View {
+        heroCard
+            .frame(minHeight: 214)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.80), lineWidth: 1)
+            )
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) {
+                    shimmer = true
+                }
+            }
+    }
+
+    private var heroCard: some View {
+        ZStack(alignment: .topLeading) {
+            heroBase
+            heroGlow
+            heroContent
+        }
+    }
+
+    private var heroBase: some View {
+        RoundedRectangle(cornerRadius: 14)
+            .fill(
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [Color.white.opacity(0.09), Color.white.opacity(0.045)]
+                        : [Color.white.opacity(0.84), Color.white.opacity(0.56)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.26 : 0.07), radius: 18, y: 10)
+    }
+
+    private var heroGlow: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    RadialGradient(
+                        colors: [AppTheme.logoYellow.opacity(colorScheme == .dark ? 0.22 : 0.28), .clear],
+                        center: .topLeading,
+                        startRadius: 20,
+                        endRadius: 280
+                    )
+                )
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    RadialGradient(
+                        colors: [AppTheme.cyan.opacity(colorScheme == .dark ? 0.14 : 0.18), .clear],
+                        center: .bottomTrailing,
+                        startRadius: 30,
+                        endRadius: 320
+                    )
+                )
+        }
+    }
+
+    private var heroContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            heroHeader
+            HStack(spacing: 10) {
+                HeroMicroMetric(title: "Today", value: "\(wordsToday)", suffix: "words")
+                HeroMicroMetric(title: "Speed", value: "\(averageWPM)", suffix: "wpm")
+                HeroMicroMetric(title: "Mode", value: "Local", suffix: "offline")
+            }
+            HStack(spacing: 8) {
+                FeaturePill(icon: "lock.fill", text: "private", color: AppTheme.readyGreen, colorScheme: colorScheme)
+                FeaturePill(icon: "globe.europe.africa.fill", text: "EN / BG", color: AppTheme.cyan, colorScheme: colorScheme)
+                FeaturePill(icon: "sparkles", text: "voice intelligence", color: AppTheme.logoYellow, colorScheme: colorScheme)
+            }
+        }
+        .padding(22)
+    }
+
+    private var heroHeader: some View {
+        HStack(alignment: .top, spacing: 16) {
+            DictatorLogoMark(size: 70)
+                .scaleEffect(shimmer ? 1.015 : 1.0)
+            VStack(alignment: .leading, spacing: 7) {
+                Label(statusTitle, systemImage: state == .recording ? "waveform" : "mic.fill")
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                Text("Private local voice layer")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(state == .idle ? "Online" : state.rawValue.capitalized)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(colorScheme == .dark ? Color.black.opacity(0.22) : Color.white.opacity(0.58)))
+        }
+    }
+
+    private var statusColor: Color {
+        switch state {
+        case .idle: return AppTheme.readyGreen
+        case .recording: return .red
+        case .processing: return AppTheme.cyan
+        case .typing: return AppTheme.logoYellow
+        }
+    }
+}
+
+private struct HeroMicroMetric: View {
+    let title: String
+    let value: String
+    let suffix: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(suffix)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.13)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+}
+
+private struct DashboardStatusPanel: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    let tint: Color
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        SettingsCard(colorScheme: colorScheme) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(AppTheme.ink)
+                    .frame(width: 34, height: 34)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(tint))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text(value)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+private struct DashboardFloatingNodeCard: View {
+    let language: AppSettings.DictationLanguage
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        SettingsCard(colorScheme: colorScheme) {
+            VStack(alignment: .leading, spacing: 10) {
+                CardHeader("Floating Node", subtitle: "Overlay controller")
+                FloatingNodePreview(language: language, colorScheme: colorScheme)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 }

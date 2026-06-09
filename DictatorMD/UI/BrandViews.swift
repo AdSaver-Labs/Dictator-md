@@ -46,17 +46,20 @@ struct DictatorLogoMark: View {
                 .offset(x: size * -0.01, y: size * 0.015)
 
             if showsStars {
-                SparkleStar(size: size * 0.13)
-                    .fill(DictatorBrand.ink)
-                    .offset(x: size * 0.25, y: -size * 0.28)
-
-                SparkleStar(size: size * 0.09)
+                SparkleStar(size: size * 0.055)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .offset(x: -size * 0.28, y: -size * 0.18)
+                    .frame(width: size * 0.055, height: size * 0.055)
+                    .offset(x: size * 0.30, y: -size * 0.31)
 
-                SparkleStar(size: size * 0.075)
-                    .fill(DictatorBrand.ink.opacity(0.78))
-                    .offset(x: size * 0.31, y: size * 0.22)
+                SparkleStar(size: size * 0.040)
+                    .fill(DictatorBrand.ink.opacity(0.72))
+                    .frame(width: size * 0.040, height: size * 0.040)
+                    .offset(x: -size * 0.30, y: -size * 0.24)
+
+                SparkleStar(size: size * 0.034)
+                    .fill(DictatorBrand.ink.opacity(0.62))
+                    .frame(width: size * 0.034, height: size * 0.034)
+                    .offset(x: size * 0.32, y: size * 0.25)
             }
         }
         .frame(width: size, height: size)
