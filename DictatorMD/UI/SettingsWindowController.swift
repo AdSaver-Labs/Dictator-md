@@ -28,7 +28,7 @@ final class SettingsWindowController {
         if window == nil {
             let hostingController = NSHostingController(rootView: SettingsView(engine: engine))
             let window = InteractiveSettingsWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                contentRect: NSRect(x: 0, y: 0, width: 1200, height: 820),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered,
                 defer: false
@@ -36,7 +36,7 @@ final class SettingsWindowController {
             window.title = "Dictator-md"
             window.isReleasedWhenClosed = false
             window.contentViewController = hostingController
-            window.minSize = NSSize(width: 920, height: 660)
+            window.minSize = NSSize(width: 1120, height: 760)
             window.level = .normal
             window.collectionBehavior = [.managed, .fullScreenPrimary]
             window.ignoresMouseEvents = false
@@ -111,12 +111,12 @@ struct WindowConfigurator: NSViewRepresentable {
         guard let window else { return }
         window.title = "Dictator-md"
         window.styleMask.insert([.titled, .closable, .miniaturizable, .resizable])
-        window.minSize = NSSize(width: 920, height: 660)
+        window.minSize = NSSize(width: 1120, height: 760)
         window.isMovable = true
         window.ignoresMouseEvents = false
         if !context.coordinator.didConfigure {
             context.coordinator.didConfigure = true
-            window.setContentSize(NSSize(width: 1040, height: 720))
+            window.setContentSize(NSSize(width: 1200, height: 820))
             window.centerOnMainScreen()
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)

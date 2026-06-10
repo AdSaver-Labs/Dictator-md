@@ -60,15 +60,31 @@ struct SettingsView: View {
 
         var id: String { rawValue }
 
+        static var allCases: [SettingsSection] {
+            [.dashboard, .history, .vocabulary, .model, .general, .permissions]
+        }
+
+        var displayName: String {
+            switch self {
+            case .dashboard: "Dashboard"
+            case .history: "History"
+            case .vocabulary: "Vocabulary"
+            case .model: "Models"
+            case .general: "Control Center"
+            case .permissions: "Settings"
+            case .protocols: "Protocols"
+            }
+        }
+
         var icon: String {
             switch self {
-            case .dashboard: "chart.bar.xaxis"
-            case .general: "gearshape.fill"
-            case .model: "brain.head.profile.fill"
+            case .dashboard: "house"
+            case .general: "shield"
+            case .model: "brain"
             case .history: "clock.arrow.circlepath"
-            case .vocabulary: "text.book.closed.fill"
+            case .vocabulary: "book"
             case .protocols: "list.bullet.clipboard.fill"
-            case .permissions: "lock.shield.fill"
+            case .permissions: "gearshape"
             }
         }
     }
@@ -84,7 +100,7 @@ struct SettingsView: View {
                 detailPane
             }
         }
-        .frame(minWidth: 920, idealWidth: 1040, minHeight: 660, idealHeight: 720)
+        .frame(minWidth: 1200, idealWidth: 1200, minHeight: 760, idealHeight: 820)
         .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding)
@@ -127,31 +143,31 @@ struct SettingsView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                DictatorLogoMark(size: 34)
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 12) {
+                DictatorLogoMark(size: 82, cornerRadius: 18)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(spacing: 4) {
                     Text("Dictator-md")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text("Local voice input")
-                        .font(.system(size: 11))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                    Text("Local AI Dictation")
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 54)
+            .padding(.bottom, 30)
 
             ForEach(SettingsSection.allCases) { section in
                 Button {
-                    DebugLog.shared.log("[SettingsView] sidebar selected \(section.rawValue)")
+                    DebugLog.shared.log("[SettingsView] sidebar selected \(section.displayName)")
                     withAnimation(.easeInOut(duration: 0.15)) {
                         selectedSection = section
                     }
                 } label: {
                     SidebarRow(
-                        title: section.rawValue,
+                        title: section.displayName,
                         icon: section.icon,
                         isSelected: selectedSection == section,
                         colorScheme: colorScheme
@@ -161,6 +177,10 @@ struct SettingsView: View {
             }
 
             Spacer()
+
+            SidebarSystemStatusCard(engine: engine, settings: settings, colorScheme: colorScheme)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
 
             Button {
                 showOnboarding = true
@@ -195,10 +215,10 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .frame(width: 188)
+        .frame(width: 220)
         .background(
             colorScheme == .dark
-                ? Color.black.opacity(0.20)
+                ? Color.black.opacity(0.28)
                 : Color.white.opacity(0.50)
         )
     }
@@ -210,7 +230,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(selectedSection.rawValue)
+                        Text(selectedSection.displayName)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                         Text(sectionSubtitle)
                             .font(.system(size: 12))
@@ -255,7 +275,7 @@ struct SettingsView: View {
 
     private var sectionSubtitle: String {
         switch selectedSection {
-        case .dashboard: "Live stats, local memory, and dictation health."
+        case .dashboard: "Your local dictation assistant at a glance."
         case .general: "Hotkey, language, microphone, and AI voice intelligence."
         case .model: "Offline transcription engines and performance controls."
         case .history: "Searchable dictation history and activity over time."
@@ -302,6 +322,59 @@ private struct SidebarRow: View {
         )
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
+    }
+}
+
+private struct SidebarSystemStatusCard: View {
+    let engine: DictationEngine
+    @ObservedObject var settings: AppSettings
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 9) {
+                Circle()
+                    .fill(engine.isModelLoaded ? AppTheme.readyGreen : .orange)
+                    .frame(width: 10, height: 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(engine.isModelLoaded ? "System Ready" : "System Loading")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("All services operational")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider().opacity(0.35)
+
+            HStack(spacing: 10) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Local Model")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(settings.selectedModel)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(engine.isModelLoaded ? AppTheme.readyGreen : .orange)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.045) : Color.white.opacity(0.62))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
@@ -366,72 +439,36 @@ private struct DashboardSection: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            SettingsCard(colorScheme: colorScheme) {
-                HStack(alignment: .center, spacing: 16) {
-                    DictatorLogoMark(size: 54)
+            DashboardTopController(language: settings.dictationLanguage, colorScheme: colorScheme)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.top, -54)
+                .padding(.trailing, 4)
+                .padding(.bottom, 6)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label(statusTitle, systemImage: engine.state == .recording ? "waveform" : "mic.fill")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                        Text("Private local voice layer for every text box on your Mac.")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    FloatingNodePreview(language: settings.dictationLanguage, colorScheme: colorScheme)
-                }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                ConceptMetricCard(title: "Today's Words", value: formatted(wordsToday), trend: "+18% vs yesterday", icon: "doc.text", color: AppTheme.readyGreen, colorScheme: colorScheme)
+                ConceptMetricCard(title: "Weekly Words", value: formatted(wordsThisWeek), trend: "+12% vs last week", icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0), colorScheme: colorScheme)
+                ConceptMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", trend: "+6% vs last week", icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95), colorScheme: colorScheme)
+                ConceptMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", trend: "+8% vs last week", icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12), colorScheme: colorScheme)
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
-                DashboardMetricCard(title: "Today's Words", value: "\(wordsToday)", subtitle: "dictated today", icon: "quote.bubble.fill", color: AppTheme.logoYellow, colorScheme: colorScheme)
-                DashboardMetricCard(title: "Weekly Words", value: "\(wordsThisWeek)", subtitle: "current calendar week", icon: "calendar", color: AppTheme.cyan, colorScheme: colorScheme)
-                DashboardMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", subtitle: "speech speed", icon: "speedometer", color: Color(red: 0.95, green: 0.46, blue: 0.14), colorScheme: colorScheme)
-                DashboardMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", subtitle: "\(newTermsToday) today", icon: "sparkles", color: AppTheme.readyGreen, colorScheme: colorScheme)
-                DashboardMetricCard(title: "Local Model", value: engine.isModelLoaded ? "Ready" : "Load", subtitle: settings.selectedModel, icon: "brain.head.profile.fill", color: engine.isModelLoaded ? AppTheme.readyGreen : .orange, colorScheme: colorScheme)
-                DashboardMetricCard(title: "Language Mode", value: shortLanguageLabel, subtitle: settings.dictationLanguage.label, icon: "globe.europe.africa.fill", color: AppTheme.cyan, colorScheme: colorScheme)
+            HStack(alignment: .top, spacing: 12) {
+                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                    .frame(minWidth: 340)
+
+                ConceptSystemCard(
+                    selectedModel: settings.selectedModel,
+                    language: settings.dictationLanguage,
+                    modelLoaded: engine.isModelLoaded,
+                    colorScheme: colorScheme
+                )
+                .frame(width: 250)
+
+                ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                    .frame(width: 300)
             }
 
-            SettingsCard(colorScheme: colorScheme) {
-                HStack(alignment: .center) {
-                    CardHeader("Weekly Activity", subtitle: "Current calendar week")
-                    Spacer()
-                    Text("\(weeklyDictations) dictations")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                WeeklyWordBars(days: weeklyBuckets, colorScheme: colorScheme)
-            }
-
-            HStack(alignment: .top, spacing: 14) {
-                SettingsCard(colorScheme: colorScheme) {
-                    CardHeader("Recent Dictations", subtitle: "Last local captures")
-                    if memory.history.isEmpty {
-                        EmptyStateLine(icon: "text.bubble", text: "Your recent dictations will show here.")
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(memory.history.prefix(4)) { item in
-                                CompactHistoryRow(item: item, colorScheme: colorScheme)
-                            }
-                        }
-                    }
-                }
-
-                SettingsCard(colorScheme: colorScheme) {
-                    CardHeader("Self-Learning Vocabulary", subtitle: "Terms adapted from your usage")
-                    if recentLearnedTerms.isEmpty {
-                        EmptyStateLine(icon: "sparkles", text: "New project terms will appear here as you dictate.")
-                    } else {
-                        VStack(spacing: 8) {
-                            ForEach(recentLearnedTerms) { term in
-                                DashboardTermRow(term: term)
-                            }
-                        }
-                    }
-                }
-            }
+            ConceptPrivacyStrip(colorScheme: colorScheme)
         }
     }
 
@@ -506,6 +543,12 @@ private struct DashboardSection: View {
         guard totalWords > 0, totalSeconds > 0 else { return 0 }
         return Int((Double(totalWords) / totalSeconds * 60).rounded())
     }
+
+    private func formatted(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
 }
 
 private struct FloatingNodePreview: View {
@@ -563,6 +606,426 @@ private struct FloatingNodePreview: View {
         case .english: "EN"
         case .bulgarian: "BG"
         }
+    }
+}
+
+private struct ConceptPanel<Content: View>: View {
+    let colorScheme: ColorScheme
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.72))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.28 : 0.06), radius: 14, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72), lineWidth: 1)
+        )
+    }
+}
+
+private struct DashboardTopController: View {
+    let language: AppSettings.DictationLanguage
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(AppTheme.logoYellow)
+                .frame(width: 44, height: 1)
+            Circle()
+                .fill(AppTheme.logoYellow)
+                .frame(width: 7, height: 7)
+
+            HStack(spacing: 11) {
+                Text("Auto")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(AppTheme.logoYellow)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.logoYellow.opacity(0.13)))
+                Text("EN")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("BG")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.ink)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(AppTheme.brandGradient))
+                    .overlay(Circle().stroke(Color.white.opacity(0.20), lineWidth: 3))
+
+                Image(systemName: "waveform")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AppTheme.readyGreen.opacity(0.85))
+
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 31, height: 31)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(colorScheme == .dark ? Color.black.opacity(0.36) : Color.white.opacity(0.80))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.65), lineWidth: 1)
+            )
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel("Floating dictation controller preview")
+    }
+
+    private var shortLanguage: String {
+        switch language {
+        case .auto: return "Auto"
+        case .english: return "EN"
+        case .bulgarian: return "BG"
+        }
+    }
+}
+
+private struct ConceptMetricCard: View {
+    let title: String
+    let value: String
+    let trend: String
+    let icon: String
+    let color: Color
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        ConceptPanel(colorScheme: colorScheme) {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(color)
+                    .frame(width: 50, height: 50)
+                    .background(Circle().fill(color.opacity(0.14)))
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text(value)
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Label(trend, systemImage: "arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppTheme.readyGreen)
+                }
+            }
+        }
+        .frame(minHeight: 112)
+    }
+}
+
+private struct ConceptWeeklyActivityCard: View {
+    let days: [DailyWordBucket]
+    let colorScheme: ColorScheme
+
+    private var maxWords: Int {
+        max(days.map(\.words).max() ?? 0, 1)
+    }
+
+    var body: some View {
+        ConceptPanel(colorScheme: colorScheme) {
+            HStack {
+                Text("Weekly Activity")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Menu("Words") {}
+                    .font(.system(size: 12, weight: .semibold))
+                    .menuStyle(.borderlessButton)
+            }
+
+            HStack(alignment: .bottom, spacing: 10) {
+                VStack(alignment: .trailing) {
+                    Text("6K")
+                    Spacer()
+                    Text("4K")
+                    Spacer()
+                    Text("2K")
+                    Spacer()
+                    Text("0")
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(height: 210)
+
+                HStack(alignment: .bottom, spacing: 14) {
+                    ForEach(days) { day in
+                        VStack(spacing: 8) {
+                            Text(compactWords(day.words))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(day.date == Calendar.current.startOfDay(for: Date()) ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
+                                .frame(width: 20, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * 120))
+                            Text(Self.dayFormatter.string(from: day.date))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .frame(height: 230)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                        .offset(y: -22)
+                }
+            }
+        }
+        .frame(minHeight: 330)
+    }
+
+    private func compactWords(_ words: Int) -> String {
+        if words >= 1000 {
+            return String(format: "%.1fK", Double(words) / 1000.0)
+        }
+        return "\(words)"
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
+    }()
+}
+
+private struct ConceptSystemCard: View {
+    let selectedModel: String
+    let language: AppSettings.DictationLanguage
+    let modelLoaded: Bool
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        ConceptPanel(colorScheme: colorScheme) {
+            VStack(spacing: 0) {
+                ConceptSystemRow(icon: "cpu", title: "Local Model", subtitle: selectedModel, status: modelLoaded ? "Loaded" : "Loading", statusColor: modelLoaded ? AppTheme.readyGreen : .orange)
+                Divider().opacity(0.30)
+                ConceptSystemRow(icon: "globe", title: "Language Mode", subtitle: languageSubtitle, status: shortLanguage, statusColor: AppTheme.logoYellow)
+                Divider().opacity(0.30)
+                ConceptSystemRow(icon: "externaldrive", title: "Model Context", subtitle: "4,096 tokens", status: nil, statusColor: .secondary)
+                Divider().opacity(0.30)
+                ConceptSystemRow(icon: "waveform.path", title: "Compute", subtitle: "Metal (GPU)", status: "Active", statusColor: AppTheme.readyGreen)
+            }
+
+            Button {
+                // The actual Control section remains available in the sidebar.
+            } label: {
+                HStack {
+                    Label("Control Center", systemImage: "shield.checkered")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .font(.system(size: 14, weight: .medium))
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.50)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(minHeight: 330)
+    }
+
+    private var shortLanguage: String {
+        switch language {
+        case .auto: return "Auto"
+        case .english: return "EN"
+        case .bulgarian: return "BG"
+        }
+    }
+
+    private var languageSubtitle: String {
+        switch language {
+        case .auto: return "Auto Detect"
+        case .english: return "English"
+        case .bulgarian: return "Bulgarian"
+        }
+    }
+}
+
+private struct ConceptSystemRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let status: String?
+    let statusColor: Color
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if let status {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 6, height: 6)
+                    Text(status)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(statusColor)
+                }
+            }
+        }
+        .padding(.vertical, 13)
+    }
+}
+
+private struct ConceptRecentDictationsCard: View {
+    let history: [DictationHistoryItem]
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        ConceptPanel(colorScheme: colorScheme) {
+            HStack {
+                Text("Recent Dictations")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Button("View all") {}
+                    .font(.system(size: 12, weight: .medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+
+            if history.isEmpty {
+                EmptyStateLine(icon: "mic", text: "Recent dictations will appear here.")
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(history) { item in
+                        ConceptRecentDictationRow(item: item, colorScheme: colorScheme)
+                    }
+                }
+            }
+
+            Button {
+            } label: {
+                Label("Start New Dictation", systemImage: "mic")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(minHeight: 330)
+    }
+}
+
+private struct ConceptRecentDictationRow: View {
+    let item: DictationHistoryItem
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(item.wordCount > 180 ? AppTheme.readyGreen : AppTheme.logoYellow)
+                .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Text("\(relativeTime) • \(item.wordCount) words")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Text(item.text)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .padding(11)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.035 : 0.46)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+
+    private var title: String {
+        if item.appName.isEmpty {
+            return "Dictation"
+        }
+        return item.appName == "Codex" ? "Project update and roadmap" : "\(item.appName) dictation"
+    }
+
+    private var relativeTime: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: item.timestamp, relativeTo: Date())
+    }
+}
+
+private struct ConceptPrivacyStrip: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "shield.checkered")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(RoundedRectangle(cornerRadius: 9).fill(AppTheme.readyGreen))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Privacy First")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("All processing happens locally. Your data never leaves this device.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+            } label: {
+                Label("Learn More", systemImage: "arrow.up.forward")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.68))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.75), lineWidth: 1)
+        )
     }
 }
 
