@@ -366,42 +366,31 @@ private struct DashboardSection: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                DashboardHeroCard(
-                    statusTitle: statusTitle,
-                    state: engine.state,
-                    wordsToday: wordsToday,
-                    averageWPM: averageWPMThisWeek,
-                    colorScheme: colorScheme
-                )
+            SettingsCard(colorScheme: colorScheme) {
+                HStack(alignment: .center, spacing: 16) {
+                    DictatorLogoMark(size: 54)
 
-                VStack(spacing: 14) {
-                    DashboardStatusPanel(
-                        title: "Language Mode",
-                        value: shortLanguageLabel,
-                        subtitle: settings.dictationLanguage.label,
-                        icon: "globe.europe.africa.fill",
-                        tint: AppTheme.cyan,
-                        colorScheme: colorScheme
-                    )
-                    DashboardStatusPanel(
-                        title: "Local Engine",
-                        value: engine.isModelLoaded ? "Ready" : "Loading",
-                        subtitle: settings.selectedModel,
-                        icon: "brain.head.profile.fill",
-                        tint: engine.isModelLoaded ? AppTheme.readyGreen : .orange,
-                        colorScheme: colorScheme
-                    )
-                    DashboardFloatingNodeCard(language: settings.dictationLanguage, colorScheme: colorScheme)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(statusTitle, systemImage: engine.state == .recording ? "waveform" : "mic.fill")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                        Text("Private local voice layer for every text box on your Mac.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    FloatingNodePreview(language: settings.dictationLanguage, colorScheme: colorScheme)
                 }
-                .frame(width: 250)
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                 DashboardMetricCard(title: "Today's Words", value: "\(wordsToday)", subtitle: "dictated today", icon: "quote.bubble.fill", color: AppTheme.logoYellow, colorScheme: colorScheme)
                 DashboardMetricCard(title: "Weekly Words", value: "\(wordsThisWeek)", subtitle: "current calendar week", icon: "calendar", color: AppTheme.cyan, colorScheme: colorScheme)
                 DashboardMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", subtitle: "speech speed", icon: "speedometer", color: Color(red: 0.95, green: 0.46, blue: 0.14), colorScheme: colorScheme)
                 DashboardMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", subtitle: "\(newTermsToday) today", icon: "sparkles", color: AppTheme.readyGreen, colorScheme: colorScheme)
+                DashboardMetricCard(title: "Local Model", value: engine.isModelLoaded ? "Ready" : "Load", subtitle: settings.selectedModel, icon: "brain.head.profile.fill", color: engine.isModelLoaded ? AppTheme.readyGreen : .orange, colorScheme: colorScheme)
+                DashboardMetricCard(title: "Language Mode", value: shortLanguageLabel, subtitle: settings.dictationLanguage.label, icon: "globe.europe.africa.fill", color: AppTheme.cyan, colorScheme: colorScheme)
             }
 
             SettingsCard(colorScheme: colorScheme) {

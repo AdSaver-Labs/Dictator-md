@@ -43,22 +43,21 @@ struct DictatorLogoMark: View {
                 .font(.system(size: size * 0.44, weight: .bold))
                 .foregroundStyle(DictatorBrand.ink)
                 .rotationEffect(.degrees(-7))
-                .offset(x: size * -0.01, y: size * 0.015)
 
             if showsStars {
-                SparkleStar(size: size * 0.055)
+                SparkleStar(size: size * 0.090)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .frame(width: size * 0.055, height: size * 0.055)
-                    .offset(x: size * 0.30, y: -size * 0.31)
+                    .frame(width: size * 0.090, height: size * 0.090)
+                    .offset(x: size * 0.31, y: -size * 0.30)
 
-                SparkleStar(size: size * 0.040)
+                SparkleStar(size: size * 0.070)
                     .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.040, height: size * 0.040)
-                    .offset(x: -size * 0.30, y: -size * 0.24)
+                    .frame(width: size * 0.070, height: size * 0.070)
+                    .offset(x: -size * 0.31, y: -size * 0.23)
 
-                SparkleStar(size: size * 0.034)
+                SparkleStar(size: size * 0.060)
                     .fill(DictatorBrand.ink.opacity(0.62))
-                    .frame(width: size * 0.034, height: size * 0.034)
+                    .frame(width: size * 0.060, height: size * 0.060)
                     .offset(x: size * 0.32, y: size * 0.25)
             }
         }
