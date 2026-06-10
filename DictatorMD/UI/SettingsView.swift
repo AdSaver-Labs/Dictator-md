@@ -6,7 +6,7 @@ private enum AppTheme {
     static let logoYellowSoft = Color(red: 1.0, green: 0.90, blue: 0.42)
     static let ink = Color(red: 0.09, green: 0.09, blue: 0.08)
     static let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
-    static let readyGreen = Color(red: 0.24, green: 0.78, blue: 0.36)
+    static let readyGreen = logoYellow
     static let cyan = Color(red: 0.13, green: 0.76, blue: 0.82)
 
     static var brandGradient: LinearGradient {
@@ -100,7 +100,7 @@ struct SettingsView: View {
                 detailPane
             }
         }
-        .frame(minWidth: 1200, idealWidth: 1200, minHeight: 760, idealHeight: 820)
+        .frame(minWidth: 920, idealWidth: 1200, minHeight: 680, idealHeight: 820)
         .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding)
@@ -441,31 +441,58 @@ private struct DashboardSection: View {
         VStack(spacing: 16) {
             DashboardTopController(language: settings.dictationLanguage, colorScheme: colorScheme)
                 .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.top, -54)
+                .padding(.top, -30)
                 .padding(.trailing, 4)
                 .padding(.bottom, 6)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 12)], spacing: 12) {
                 ConceptMetricCard(title: "Today's Words", value: formatted(wordsToday), trend: "+18% vs yesterday", icon: "doc.text", color: AppTheme.readyGreen, colorScheme: colorScheme)
                 ConceptMetricCard(title: "Weekly Words", value: formatted(wordsThisWeek), trend: "+12% vs last week", icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0), colorScheme: colorScheme)
                 ConceptMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", trend: "+6% vs last week", icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95), colorScheme: colorScheme)
                 ConceptMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", trend: "+8% vs last week", icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12), colorScheme: colorScheme)
             }
 
-            HStack(alignment: .top, spacing: 12) {
-                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
-                    .frame(minWidth: 340)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                        .frame(minWidth: 340)
 
-                ConceptSystemCard(
-                    selectedModel: settings.selectedModel,
-                    language: settings.dictationLanguage,
-                    modelLoaded: engine.isModelLoaded,
-                    colorScheme: colorScheme
-                )
-                .frame(width: 250)
+                    ConceptSystemCard(
+                        selectedModel: settings.selectedModel,
+                        language: settings.dictationLanguage,
+                        modelLoaded: engine.isModelLoaded,
+                        colorScheme: colorScheme
+                    )
+                    .frame(width: 250)
 
-                ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
-                    .frame(width: 300)
+                    ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                        .frame(width: 300)
+                }
+
+                VStack(spacing: 12) {
+                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                    HStack(alignment: .top, spacing: 12) {
+                        ConceptSystemCard(
+                            selectedModel: settings.selectedModel,
+                            language: settings.dictationLanguage,
+                            modelLoaded: engine.isModelLoaded,
+                            colorScheme: colorScheme
+                        )
+
+                        ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                    }
+                }
+
+                VStack(spacing: 12) {
+                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                    ConceptSystemCard(
+                        selectedModel: settings.selectedModel,
+                        language: settings.dictationLanguage,
+                        modelLoaded: engine.isModelLoaded,
+                        colorScheme: colorScheme
+                    )
+                    ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                }
             }
 
             ConceptPrivacyStrip(colorScheme: colorScheme)
@@ -737,6 +764,7 @@ private struct ConceptMetricCard: View {
 private struct ConceptWeeklyActivityCard: View {
     let days: [DailyWordBucket]
     let colorScheme: ColorScheme
+    @State private var focusedDay: Date?
 
     private var maxWords: Int {
         max(days.map(\.words).max() ?? 0, 1)
@@ -769,18 +797,50 @@ private struct ConceptWeeklyActivityCard: View {
 
                 HStack(alignment: .bottom, spacing: 14) {
                     ForEach(days) { day in
+                        let isToday = day.date == Calendar.current.startOfDay(for: Date())
+                        let isFocused = focusedDay == day.date
                         VStack(spacing: 8) {
-                            Text(compactWords(day.words))
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(day.date == Calendar.current.startOfDay(for: Date()) ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
-                                .frame(width: 20, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * 120))
+                            VStack(spacing: 2) {
+                                Text(compactWords(day.words))
+                                    .font(.system(size: isFocused ? 11 : 10, weight: .semibold))
+                                if isFocused {
+                                    Text("\(day.dictations) captures")
+                                        .font(.system(size: 8, weight: .medium))
+                                }
+                            }
+                            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+                            .padding(.horizontal, isFocused ? 6 : 0)
+                            .padding(.vertical, isFocused ? 4 : 0)
+                            .background(
+                                Capsule()
+                                    .fill(isFocused ? AppTheme.logoYellow.opacity(0.12) : .clear)
+                            )
+                            .animation(.easeOut(duration: 0.16), value: isFocused)
+
+                            RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
+                                .fill(isToday || isFocused ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
+                                .frame(width: isFocused ? 26 : 20, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 138 : 120)))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
+                                        .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.52 : 0), lineWidth: 1)
+                                )
+                                .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.30 : 0.10), radius: isFocused ? 12 : 5)
                             Text(Self.dayFormatter.string(from: day.date))
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 10, weight: isFocused ? .bold : .medium))
+                                .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
                         }
                         .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                                focusedDay = hovering ? day.date : (focusedDay == day.date ? nil : focusedDay)
+                            }
+                        }
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                                focusedDay = focusedDay == day.date ? nil : day.date
+                            }
+                        }
                     }
                 }
                 .frame(height: 230)

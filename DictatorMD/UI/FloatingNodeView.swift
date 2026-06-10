@@ -14,7 +14,7 @@ final class FloatingNodeController {
     private weak var engine: DictationEngine?
     var openSettingsAction: (() -> Void)?
 
-    private let panelSize = NSSize(width: 190, height: 50)
+    private let panelSize = NSSize(width: 190, height: 52)
     private let bottomOffset: CGFloat = 8
 
     private init() {}
@@ -131,10 +131,19 @@ struct FloatingNodeView: View {
     }
 
     private var collapsedNode: some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(statusColor)
-            .frame(width: 96, height: 4)
-            .shadow(color: statusColor.opacity(0.35), radius: 8)
+        Capsule()
+            .fill(statusColor.opacity(0.58))
+            .frame(width: 92, height: 5)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.65)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(statusColor.opacity(0.78), lineWidth: 1.2)
+            )
+            .shadow(color: statusColor.opacity(0.22), radius: 4)
             .padding(.bottom, 10)
             .accessibilityLabel("Dictation node")
             .onTapGesture {
@@ -155,12 +164,18 @@ struct FloatingNodeView: View {
         .padding(.vertical, 7)
         .background(
             Capsule()
-                .fill(colorScheme == .dark ? Color.black.opacity(0.92) : Color.white.opacity(0.96))
+                .fill(.ultraThinMaterial)
+                .background(
+                    Capsule()
+                        .fill(colorScheme == .dark ? Color.black.opacity(0.76) : Color.white.opacity(0.78))
+                        .blur(radius: 0.8)
+                )
         )
         .overlay(
             Capsule()
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(statusColor.opacity(engine.state == .idle ? 0.75 : 0.90), lineWidth: 1.35)
         )
+        .shadow(color: statusColor.opacity(0.26), radius: 13)
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.30 : 0.12), radius: 10, y: 4)
         .padding(.bottom, 5)
     }
@@ -173,7 +188,8 @@ struct FloatingNodeView: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .frame(width: 42, height: 28)
-                .background(Capsule().fill(Color.white.opacity(0.10)))
+                .foregroundStyle(statusColor)
+                .background(Capsule().fill(statusColor.opacity(0.13)))
         }
         .buttonStyle(.plain)
         .help("Switch language")
@@ -186,10 +202,11 @@ struct FloatingNodeView: View {
         } label: {
             Image(systemName: micIcon)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(engine.state == .idle ? DictatorBrand.ink : .white)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(statusColor))
-                .shadow(color: statusColor.opacity(0.35), radius: 10)
+                .overlay(Circle().stroke(Color.white.opacity(engine.state == .idle ? 0.26 : 0.16), lineWidth: 1))
+                .shadow(color: statusColor.opacity(0.42), radius: 10)
         }
         .buttonStyle(.plain)
         .help(engine.state == .recording ? "Stop dictation" : "Start dictation")
@@ -203,7 +220,7 @@ struct FloatingNodeView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.white.opacity(0.08)))
+                .background(Circle().fill(statusColor.opacity(0.10)))
         }
         .buttonStyle(.plain)
         .help("Open settings")
@@ -211,10 +228,10 @@ struct FloatingNodeView: View {
 
     private var statusColor: Color {
         switch engine.state {
-        case .idle: engine.isModelLoaded ? .green : .orange
+        case .idle: engine.isModelLoaded ? DictatorBrand.yellow : .orange
         case .recording: .red
-        case .processing: .orange
-        case .typing: .blue
+        case .processing: DictatorBrand.yellow
+        case .typing: DictatorBrand.yellow
         }
     }
 

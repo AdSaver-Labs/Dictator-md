@@ -7,7 +7,7 @@ enum DictatorBrand {
     static let graphite = Color(red: 0.09, green: 0.095, blue: 0.10)
     static let panel = Color(red: 0.13, green: 0.135, blue: 0.145)
     static let cyan = Color(red: 0.18, green: 0.78, blue: 0.86)
-    static let green = Color(red: 0.27, green: 0.86, blue: 0.48)
+    static let green = yellow
 
     static var iconGradient: LinearGradient {
         LinearGradient(
@@ -45,20 +45,20 @@ struct DictatorLogoMark: View {
                 .rotationEffect(.degrees(-7))
 
             if showsStars {
-                SparkleStar(size: size * 0.090)
+                SparkleStar(size: size * 0.105)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .frame(width: size * 0.090, height: size * 0.090)
-                    .offset(x: size * 0.31, y: -size * 0.30)
+                    .frame(width: size * 0.105, height: size * 0.105)
+                    .offset(x: size * 0.32, y: -size * 0.31)
 
                 SparkleStar(size: size * 0.070)
                     .fill(DictatorBrand.ink.opacity(0.72))
                     .frame(width: size * 0.070, height: size * 0.070)
-                    .offset(x: -size * 0.31, y: -size * 0.23)
+                    .offset(x: size * 0.20, y: -size * 0.42)
 
-                SparkleStar(size: size * 0.060)
+                SparkleStar(size: size * 0.058)
                     .fill(DictatorBrand.ink.opacity(0.62))
-                    .frame(width: size * 0.060, height: size * 0.060)
-                    .offset(x: size * 0.32, y: size * 0.25)
+                    .frame(width: size * 0.058, height: size * 0.058)
+                    .offset(x: size * 0.43, y: -size * 0.12)
             }
         }
         .frame(width: size, height: size)
