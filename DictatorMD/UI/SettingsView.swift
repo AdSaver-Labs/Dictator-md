@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Carbon.HIToolbox
 
@@ -716,56 +717,47 @@ private struct DashboardTopController: View {
     let colorScheme: ColorScheme
 
     var body: some View {
-        HStack(spacing: 0) {
-            Rectangle()
-                .fill(AppTheme.logoYellow)
-                .frame(width: 44, height: 1)
-            Circle()
-                .fill(AppTheme.logoYellow)
-                .frame(width: 7, height: 7)
+        HStack(spacing: 11) {
+            Text("Auto")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(AppTheme.logoYellow)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.logoYellow.opacity(0.13)))
+            Text("EN")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("BG")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
 
-            HStack(spacing: 11) {
-                Text("Auto")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(AppTheme.logoYellow)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.logoYellow.opacity(0.13)))
-                Text("EN")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text("BG")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+            Image(systemName: "mic.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(AppTheme.ink)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(AppTheme.brandGradient))
+                .overlay(Circle().stroke(Color.white.opacity(0.20), lineWidth: 3))
 
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(AppTheme.ink)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(AppTheme.brandGradient))
-                    .overlay(Circle().stroke(Color.white.opacity(0.20), lineWidth: 3))
+            Image(systemName: "waveform")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.readyGreen.opacity(0.85))
 
-                Image(systemName: "waveform")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(AppTheme.readyGreen.opacity(0.85))
-
-                Image(systemName: "arrow.up.forward")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 31, height: 31)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(colorScheme == .dark ? Color.black.opacity(0.36) : Color.white.opacity(0.80))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.65), lineWidth: 1)
-            )
+            Image(systemName: "arrow.up.forward")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 31, height: 31)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(colorScheme == .dark ? Color.black.opacity(0.36) : Color.white.opacity(0.80))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.65), lineWidth: 1)
+        )
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityLabel("Floating dictation controller preview")
     }
@@ -2594,11 +2586,12 @@ private struct HistoryRow: View {
                 .buttonStyle(.plain)
                 .help(isExpanded ? "Collapse dictation" : "Expand dictation")
             }
-            Text(item.text)
-                .font(.system(size: 12))
-                .lineLimit(isExpanded ? nil : 3)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+            SelectableHistoryText(
+                text: item.text,
+                isExpanded: isExpanded,
+                colorScheme: colorScheme
+            )
+            .frame(minHeight: isExpanded ? 74 : 52)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2615,6 +2608,54 @@ private struct HistoryRow: View {
         formatter.timeStyle = .short
         return formatter
     }()
+}
+
+private struct SelectableHistoryText: NSViewRepresentable {
+    let text: String
+    let isExpanded: Bool
+    let colorScheme: ColorScheme
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 0, height: 0)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.allowsUndo = false
+        textView.usesFindBar = false
+        textView.font = NSFont.systemFont(ofSize: 12)
+
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.documentView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+        textView.string = isExpanded ? text : truncatedText
+        textView.textColor = colorScheme == .dark ? NSColor.labelColor : NSColor.labelColor
+        textView.backgroundColor = .clear
+        textView.font = NSFont.systemFont(ofSize: 12)
+        textView.textContainer?.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+    }
+
+    private var truncatedText: String {
+        let limit = 320
+        guard text.count > limit else { return text }
+        return String(text.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
+    }
 }
 
 // MARK: - Vocabulary Section

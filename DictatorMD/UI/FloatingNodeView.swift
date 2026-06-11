@@ -88,6 +88,7 @@ struct FloatingNodeView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
     @State private var collapseWorkItem: DispatchWorkItem?
+    @State private var activityPulse = false
 
     var body: some View {
         ZStack(alignment: .center) {
@@ -128,12 +129,17 @@ struct FloatingNodeView: View {
             collapseWorkItem?.cancel()
             collapseWorkItem = nil
         }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true)) {
+                activityPulse = true
+            }
+        }
     }
 
     private var collapsedNode: some View {
         Capsule()
             .fill(statusColor.opacity(0.58))
-            .frame(width: 92, height: 5)
+            .frame(width: isWorking ? 112 : 92, height: isWorking ? 6 : 5)
             .background(
                 Capsule()
                     .fill(.ultraThinMaterial)
@@ -143,7 +149,19 @@ struct FloatingNodeView: View {
                 Capsule()
                     .stroke(statusColor.opacity(0.78), lineWidth: 1.2)
             )
-            .shadow(color: statusColor.opacity(0.22), radius: 4)
+            .overlay {
+                if isWorking {
+                    HStack(spacing: 4) {
+                        ForEach(0..<3, id: \.self) { index in
+                            Circle()
+                                .fill(Color.white.opacity(0.86))
+                                .frame(width: 3.5, height: 3.5)
+                                .opacity(activityPulse ? (index == 1 ? 1 : 0.42) : (index == 1 ? 0.42 : 1))
+                        }
+                    }
+                }
+            }
+            .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
             .padding(.bottom, 10)
             .accessibilityLabel("Dictation node")
             .onTapGesture {
@@ -158,6 +176,9 @@ struct FloatingNodeView: View {
         HStack(spacing: 8) {
             languageButton
             micButton
+            if isWorking {
+                processingIndicator
+            }
             settingsButton
         }
         .padding(.horizontal, 8)
@@ -212,6 +233,19 @@ struct FloatingNodeView: View {
         .help(engine.state == .recording ? "Stop dictation" : "Start dictation")
     }
 
+    private var processingIndicator: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(statusColor)
+                    .frame(width: 4, height: activityPulse ? CGFloat(8 + index * 3) : CGFloat(14 - index * 2))
+                    .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true).delay(Double(index) * 0.08), value: activityPulse)
+            }
+        }
+        .frame(width: 24, height: 28)
+        .help(engine.state == .processing ? "Transcribing..." : "Pasting...")
+    }
+
     private var settingsButton: some View {
         Button {
             FloatingNodeController.shared.openSettingsWindow()
@@ -230,9 +264,13 @@ struct FloatingNodeView: View {
         switch engine.state {
         case .idle: engine.isModelLoaded ? DictatorBrand.yellow : .orange
         case .recording: .red
-        case .processing: DictatorBrand.yellow
-        case .typing: DictatorBrand.yellow
+        case .processing: DictatorBrand.cyan
+        case .typing: Color(red: 0.38, green: 0.62, blue: 1.0)
         }
+    }
+
+    private var isWorking: Bool {
+        engine.state == .processing || engine.state == .typing
     }
 
     private var micIcon: String {

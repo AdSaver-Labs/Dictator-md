@@ -11,30 +11,43 @@ final class TextInjector {
         source = CGEventSource(stateID: .hidSystemState)
     }
 
-    func insert(text: String, target: InsertionTarget? = nil) {
+    @discardableResult
+    func insert(text: String, target: InsertionTarget? = nil) -> Bool {
         let prepared = prepareForInsertion(text)
-        guard !prepared.isEmpty else { return }
+        guard !prepared.isEmpty else { return false }
         DebugLog.shared.log("[TextInjector] insert length=\(prepared.count) target=\(target?.appName ?? "nil") bundle=\(target?.bundleIdentifier ?? "nil") hasElement=\(target?.focusedElement != nil)")
 
-        typingQueue.sync {
+        return typingQueue.sync {
             restoreTargetIfNeeded(target)
             if !AXIsProcessTrusted() {
                 DebugLog.shared.log("[TextInjector] AX not trusted; trying clipboard paste fallback")
                 if pasteWithClipboard(text: prepared) {
-                    return
+                    return true
                 }
                 DebugLog.shared.log("[TextInjector] AX clipboard paste failed; using direct unicode typing fallback")
                 typeUnicode(text: prepared)
-                return
+                return true
             }
-            if !pasteWithClipboard(text: prepared) {
-                DebugLog.shared.log("[TextInjector] clipboardPaste failed; falling back to unicode")
+
+            if pasteWithClipboardRetry(text: prepared, target: target) {
+                return true
+            }
+
+            DebugLog.shared.log("[TextInjector] clipboardPaste failed after retries; falling back to unicode")
+            restoreTargetIfNeeded(target)
+            if target?.focusedElement != nil {
                 typeUnicode(text: prepared)
+                return true
             }
+
+            DebugLog.shared.log("[TextInjector] no focused target for unicode fallback; leaving transcript on clipboard")
+            putOnClipboard(text: prepared)
+            return false
         }
     }
 
-    func insert(text: String, targetApp: NSRunningApplication? = nil) {
+    @discardableResult
+    func insert(text: String, targetApp: NSRunningApplication? = nil) -> Bool {
         insert(
             text: text,
             target: InsertionTarget(app: targetApp, focusedElement: nil, selectedTextRange: nil)
@@ -52,7 +65,7 @@ final class TextInjector {
 
         targetApp.activate(options: [.activateIgnoringOtherApps])
         DebugLog.shared.log("[TextInjector] activateTarget name=\(targetApp.localizedName ?? "nil") pid=\(targetApp.processIdentifier)")
-        Thread.sleep(forTimeInterval: 0.10)
+        Thread.sleep(forTimeInterval: 0.16)
 
         guard let focusedElement = target?.focusedElement else { return }
 
@@ -64,7 +77,7 @@ final class TextInjector {
         )
         let selectedRangeResult = restoreSelectedTextRange(target?.selectedTextRange, on: focusedElement)
         DebugLog.shared.log("[TextInjector] restoreFocus result=\(focusResult.rawValue) selectedRange=\(selectedRangeResult.map(String.init) ?? "nil")")
-        Thread.sleep(forTimeInterval: 0.06)
+        Thread.sleep(forTimeInterval: 0.10)
     }
 
     private func prepareForInsertion(_ text: String) -> String {
@@ -76,27 +89,53 @@ final class TextInjector {
         return trimmed
     }
 
+    private func pasteWithClipboardRetry(text: String, target: InsertionTarget?) -> Bool {
+        let delays: [TimeInterval] = [0.05, 0.14, 0.28]
+        for (index, delay) in delays.enumerated() {
+            if index > 0 {
+                DebugLog.shared.log("[TextInjector] retryPaste attempt=\(index + 1)")
+                restoreTargetIfNeeded(target)
+            }
+            Thread.sleep(forTimeInterval: delay)
+            if pasteWithClipboard(text: text, restoreClipboard: index == delays.count - 1) {
+                return true
+            }
+        }
+        putOnClipboard(text: text)
+        return false
+    }
+
     private func pasteWithClipboard(text: String) -> Bool {
+        pasteWithClipboard(text: text, restoreClipboard: true)
+    }
+
+    private func pasteWithClipboard(text: String, restoreClipboard: Bool) -> Bool {
         let pasteboard = NSPasteboard.general
         let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
 
         pasteboard.clearContents()
         guard pasteboard.setString(text, forType: .string) else {
             DebugLog.shared.log("[TextInjector] pasteboardSetString failed")
-            snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+            if restoreClipboard {
+                snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+            }
             return false
         }
 
-        Thread.sleep(forTimeInterval: 0.035)
+        Thread.sleep(forTimeInterval: 0.055)
 
         guard postPasteShortcut() else {
             DebugLog.shared.log("[TextInjector] postPasteShortcut failed")
-            snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+            if restoreClipboard {
+                snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+            }
             return false
         }
 
         DebugLog.shared.log("[TextInjector] postPasteShortcut ok")
-        snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+        if restoreClipboard {
+            snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+        }
         return true
     }
 
@@ -119,6 +158,7 @@ final class TextInjector {
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
         keyDown.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.012)
         keyUp.post(tap: .cghidEventTap)
         return true
     }

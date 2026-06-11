@@ -477,7 +477,8 @@ final class DictationEngine {
                         audioDuration: audioDuration
                     )
                 }
-                injector.insert(text: fullText, target: target)
+                let inserted = injector.insert(text: fullText, target: target)
+                DebugLog.shared.log("[DictationEngine] insertionResult success=\(inserted)")
             } else {
                 DebugLog.shared.log("[DictationEngine] insertionSkipped emptyOrSilence audioDuration=\(String(format: "%.2f", audioDuration))")
             }

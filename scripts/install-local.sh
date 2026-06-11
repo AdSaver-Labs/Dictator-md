@@ -46,6 +46,9 @@ rm -rf "$DEST"
 
 cp -R "$APP_BUNDLE" "$DEST"
 xattr -cr "$DEST"
+touch "$DEST"
+touch "$DEST/Contents/Info.plist"
+touch "$DEST/Contents/Resources/AppIcon.icns"
 
 "$LSREGISTER" -u /Applications/DictatorMD.app 2>/dev/null || true
 "$LSREGISTER" -u /Applications/WhisperDictation.app 2>/dev/null || true
