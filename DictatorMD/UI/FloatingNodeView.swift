@@ -180,14 +180,7 @@ struct FloatingNodeView: View {
             )
             .overlay {
                 if isWorking {
-                    HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Circle()
-                                .fill(Color.white.opacity(0.86))
-                                .frame(width: 3.5, height: 3.5)
-                                .opacity(activityPulse ? (index == 1 ? 1 : 0.42) : (index == 1 ? 0.42 : 1))
-                        }
-                    }
+                    LoadingDots(color: .white, dotSize: 3.8, spacing: 4)
                 }
             }
             .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
@@ -253,14 +246,7 @@ struct FloatingNodeView: View {
     }
 
     private var processingIndicator: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<3, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(statusColor)
-                    .frame(width: 4, height: activityPulse ? CGFloat(8 + index * 3) : CGFloat(14 - index * 2))
-                    .animation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true).delay(Double(index) * 0.08), value: activityPulse)
-            }
-        }
+        LoadingDots(color: statusColor, dotSize: 5, spacing: 4)
         .frame(width: 24, height: 28)
         .help(engine.state == .processing ? "Transcribing..." : "Pasting...")
     }
@@ -323,6 +309,28 @@ struct FloatingNodeView: View {
     private func animateHover(_ hovering: Bool) {
         withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.92, blendDuration: 0.04)) {
             isHovering = hovering
+        }
+    }
+}
+
+private struct LoadingDots: View {
+    let color: Color
+    let dotSize: CGFloat
+    let spacing: CGFloat
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            HStack(spacing: spacing) {
+                ForEach(0..<3, id: \.self) { index in
+                    let phase = (sin((time * 5.2) - Double(index) * 0.72) + 1) / 2
+                    Circle()
+                        .fill(color.opacity(0.36 + phase * 0.64))
+                        .frame(width: dotSize, height: dotSize)
+                        .offset(y: CGFloat(-phase * 3.0))
+                        .scaleEffect(0.82 + phase * 0.24)
+                }
+            }
         }
     }
 }

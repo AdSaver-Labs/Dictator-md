@@ -613,7 +613,8 @@ private struct DashboardSection: View {
 
     private var weeklyBuckets: [DailyWordBucket] {
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date())
-        return dailyBuckets(startingAt: weekStart, endingAt: Date(), calendar: calendar, history: memory.history)
+        let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? Date()
+        return dailyBuckets(startingAt: weekStart, endingAt: weekEnd, calendar: calendar, history: memory.history)
     }
 
     private var weeklyDictations: Int {
@@ -871,7 +872,7 @@ private struct ConceptWeeklyActivityCard: View {
                 .foregroundStyle(.secondary)
                 .frame(height: 210)
 
-                HStack(alignment: .bottom, spacing: 14) {
+                HStack(alignment: .bottom, spacing: 12) {
                     ForEach(days) { day in
                         let isToday = day.date == Calendar.current.startOfDay(for: Date())
                         let isFocused = focusedDay == day.date
@@ -885,8 +886,8 @@ private struct ConceptWeeklyActivityCard: View {
                                 }
                             }
                             .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
-                            .padding(.horizontal, isFocused ? 6 : 0)
-                            .padding(.vertical, isFocused ? 4 : 0)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
                             .background(
                                 Capsule()
                                     .fill(isFocused ? AppTheme.logoYellow.opacity(0.12) : .clear)
@@ -895,15 +896,20 @@ private struct ConceptWeeklyActivityCard: View {
 
                             RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
                                 .fill(isToday || isFocused ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
-                                .frame(width: isFocused ? 26 : 20, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 138 : 120)))
+                                .frame(width: isFocused ? 25 : 23, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 126 : 120)))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
                                         .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.52 : 0), lineWidth: 1)
                                 )
-                                .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.30 : 0.10), radius: isFocused ? 12 : 5)
-                            Text(Self.dayFormatter.string(from: day.date))
-                                .font(.system(size: 10, weight: isFocused ? .bold : .medium))
-                                .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+                                .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.24 : 0.10), radius: isFocused ? 8 : 5)
+                            VStack(spacing: 1) {
+                                Text(Self.dayFormatter.string(from: day.date))
+                                    .font(.system(size: 10, weight: isFocused ? .bold : .medium))
+                                Text(Self.dateFormatter.string(from: day.date))
+                                    .font(.system(size: 8, weight: .medium))
+                                    .monospacedDigit()
+                            }
+                            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .contentShape(Rectangle())
@@ -941,6 +947,12 @@ private struct ConceptWeeklyActivityCard: View {
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE"
+        return formatter
+    }()
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
         return formatter
     }()
 }
@@ -1473,42 +1485,10 @@ private struct WeeklyWordBars: View {
     let days: [DailyWordBucket]
     let colorScheme: ColorScheme
 
-    private var maxWords: Int {
-        max(days.map(\.words).max() ?? 0, 1)
-    }
-
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            ForEach(days) { day in
-                VStack(spacing: 6) {
-                    Text("\(day.words)")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    GeometryReader { proxy in
-                        VStack {
-                            Spacer(minLength: 0)
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(AppTheme.selectedGradient)
-                                .frame(height: max(8, proxy.size.height * CGFloat(day.words) / CGFloat(maxWords)))
-                        }
-                    }
-                    .frame(height: 86)
-                    Text(Self.dayFormatter.string(from: day.date))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.top, 2)
+        ConceptWeeklyActivityCard(days: days, colorScheme: colorScheme)
+            .frame(minHeight: 330)
     }
-
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE"
-        return formatter
-    }()
 }
 
 private struct DashboardTermRow: View {
@@ -2251,9 +2231,10 @@ private struct HistorySection: View {
 
     private var currentWeekBuckets: [DailyWordBucket] {
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date())
+        let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? Date()
         return dailyBuckets(
             startingAt: weekStart,
-            endingAt: Date(),
+            endingAt: weekEnd,
             calendar: calendar,
             history: memory.history
         )
@@ -2611,7 +2592,7 @@ private struct HistoryRow: View {
                 isExpanded: isExpanded,
                 colorScheme: colorScheme
             )
-            .frame(minHeight: isExpanded ? 74 : 52)
+            .frame(height: isExpanded ? expandedTextHeight : 52)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2628,6 +2609,15 @@ private struct HistoryRow: View {
         formatter.timeStyle = .short
         return formatter
     }()
+
+    private var expandedTextHeight: CGFloat {
+        let estimatedLines = item.text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .reduce(0) { total, line in
+                total + max(1, Int(ceil(Double(line.count) / 96.0)))
+            }
+        return CGFloat(min(max(estimatedLines, 4), 90)) * 17 + 12
+    }
 }
 
 private struct SelectableHistoryText: NSViewRepresentable {
