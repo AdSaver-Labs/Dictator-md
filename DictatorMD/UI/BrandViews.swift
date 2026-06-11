@@ -6,7 +6,7 @@ enum DictatorBrand {
     static let ink = Color(red: 0.08, green: 0.08, blue: 0.07)
     static let graphite = Color(red: 0.09, green: 0.095, blue: 0.10)
     static let panel = Color(red: 0.13, green: 0.135, blue: 0.145)
-    static let cyan = Color(red: 0.18, green: 0.78, blue: 0.86)
+    static let cyan = Color(red: 0.42, green: 0.78, blue: 1.0)
     static let green = yellow
 
     static var iconGradient: LinearGradient {

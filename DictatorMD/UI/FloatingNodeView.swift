@@ -270,7 +270,7 @@ struct FloatingNodeView: View {
         case .idle: engine.isModelLoaded ? DictatorBrand.yellow : .orange
         case .recording: .red
         case .processing: DictatorBrand.cyan
-        case .typing: Color(red: 0.38, green: 0.62, blue: 1.0)
+        case .typing: DictatorBrand.cyan
         }
     }
 

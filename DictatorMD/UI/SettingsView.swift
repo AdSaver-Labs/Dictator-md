@@ -8,7 +8,7 @@ private enum AppTheme {
     static let ink = Color(red: 0.09, green: 0.09, blue: 0.08)
     static let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
     static let readyGreen = logoYellow
-    static let cyan = Color(red: 0.13, green: 0.76, blue: 0.82)
+    static let cyan = Color(red: 0.42, green: 0.78, blue: 1.0)
 
     static var brandGradient: LinearGradient {
         LinearGradient(
@@ -818,7 +818,7 @@ private struct DashboardTopController: View {
         case .idle: return engine.isModelLoaded ? AppTheme.logoYellow : .orange
         case .recording: return .red
         case .processing: return AppTheme.cyan
-        case .typing: return Color(red: 0.38, green: 0.62, blue: 1.0)
+        case .typing: return AppTheme.cyan
         }
     }
 
