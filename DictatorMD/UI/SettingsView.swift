@@ -3,8 +3,8 @@ import SwiftUI
 import Carbon.HIToolbox
 
 private enum AppTheme {
-    static let logoYellow = Color(red: 1.0, green: 0.82, blue: 0.16)
-    static let logoYellowSoft = Color(red: 1.0, green: 0.90, blue: 0.42)
+    static let logoYellow = Color(red: 0.92, green: 0.61, blue: 0.06)
+    static let logoYellowSoft = Color(red: 0.98, green: 0.77, blue: 0.16)
     static let ink = Color(red: 0.09, green: 0.09, blue: 0.08)
     static let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
     static let readyGreen = logoYellow
@@ -20,7 +20,7 @@ private enum AppTheme {
 
     static var selectedGradient: LinearGradient {
         LinearGradient(
-            colors: [logoYellow, Color(red: 0.90, green: 0.58, blue: 0.08)],
+            colors: [logoYellow, Color(red: 0.78, green: 0.40, blue: 0.03)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -2262,7 +2262,7 @@ private struct HistorySection: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                 ConceptMetricCard(
                     descriptor: DashboardMetricDescriptor(title: "Dictations", value: "\(memory.history.count)", trend: "stored locally", icon: "mic.badge.plus", color: AppTheme.logoYellow),
                     colorScheme: colorScheme
@@ -2277,6 +2277,14 @@ private struct HistorySection: View {
                 )
                 ConceptMetricCard(
                     descriptor: DashboardMetricDescriptor(title: "Learned Terms", value: "\(memory.learnedTerms.count)", trend: "vocabulary bias", icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
+                    colorScheme: colorScheme
+                )
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Cleanup Cuts", value: "\(cleanupCuts)", trend: "fillers removed", icon: "wand.and.stars", color: Color(red: 0.74, green: 0.48, blue: 1.0)),
+                    colorScheme: colorScheme
+                )
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Time Saved", value: timeSavedLabel, trend: "vs typing", icon: "clock.badge.checkmark", color: Color(red: 0.95, green: 0.45, blue: 0.28)),
                     colorScheme: colorScheme
                 )
             }
@@ -2391,6 +2399,18 @@ private struct HistorySection: View {
         let totalSeconds = items.reduce(0.0) { $0 + $1.audioDuration }
         guard totalWords > 0, totalSeconds > 0 else { return 0 }
         return Int((Double(totalWords) / totalSeconds * 60).rounded())
+    }
+
+    private var cleanupCuts: Int {
+        memory.history.reduce(0) { $0 + ($1.cleanupCutCount ?? 0) }
+    }
+
+    private var timeSavedLabel: String {
+        let minutes = max(0, Int((Double(totalWords) / 45.0).rounded()))
+        if minutes >= 60 {
+            return String(format: "%.1fh", Double(minutes) / 60.0)
+        }
+        return "\(minutes)m"
     }
 
     private var currentWeekBuckets: [DailyWordBucket] {

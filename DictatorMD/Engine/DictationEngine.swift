@@ -464,6 +464,7 @@ final class DictationEngine {
 
             let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody)
             let fullText = Self.guardLanguageOutput(correctedText, language: language)
+            let cleanupCutCount = DictationMemory.estimatedCleanupCutCount(raw: rawText, final: fullText)
             fputs("[DictationEngine] Final text: \(fullText)\n", stderr)
             DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count) text=\"\(fullText)\"")
 
@@ -474,7 +475,8 @@ final class DictationEngine {
                         text: fullText,
                         language: language,
                         targetApp: targetApp,
-                        audioDuration: audioDuration
+                        audioDuration: audioDuration,
+                        cleanupCutCount: cleanupCutCount
                     )
                 }
                 let inserted = injector.insert(text: fullText, target: target)

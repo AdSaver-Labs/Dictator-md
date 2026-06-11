@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum DictatorBrand {
-    static let yellow = Color(red: 1.0, green: 0.80, blue: 0.13)
-    static let yellowSoft = Color(red: 1.0, green: 0.91, blue: 0.35)
+    static let yellow = Color(red: 0.92, green: 0.61, blue: 0.06)
+    static let yellowSoft = Color(red: 0.98, green: 0.77, blue: 0.16)
     static let ink = Color(red: 0.08, green: 0.08, blue: 0.07)
     static let graphite = Color(red: 0.09, green: 0.095, blue: 0.10)
     static let panel = Color(red: 0.13, green: 0.135, blue: 0.145)
@@ -11,7 +11,7 @@ enum DictatorBrand {
 
     static var iconGradient: LinearGradient {
         LinearGradient(
-            colors: [yellowSoft, yellow, Color(red: 0.92, green: 0.58, blue: 0.07)],
+            colors: [yellowSoft, yellow, Color(red: 0.78, green: 0.40, blue: 0.03)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -40,24 +40,25 @@ struct DictatorLogoMark: View {
                 )
 
             Image(systemName: "mic.fill")
-                .font(.system(size: size * 0.38, weight: .bold))
+                .font(.system(size: size * 0.44, weight: .bold))
                 .foregroundStyle(DictatorBrand.ink)
+                .rotationEffect(.degrees(-5))
 
             if showsStars {
-                SparkleStar(size: size * 0.124)
+                SparkleStar(size: size * 0.138)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .frame(width: size * 0.124, height: size * 0.124)
-                    .offset(x: size * 0.16, y: -size * 0.12)
+                    .frame(width: size * 0.138, height: size * 0.138)
+                    .offset(x: size * 0.18, y: -size * 0.14)
 
-                SparkleStar(size: size * 0.064)
+                SparkleStar(size: size * 0.078)
                     .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.064, height: size * 0.064)
-                    .offset(x: size * 0.28, y: -size * 0.24)
+                    .frame(width: size * 0.078, height: size * 0.078)
+                    .offset(x: size * 0.30, y: -size * 0.25)
 
-                SparkleStar(size: size * 0.072)
-                    .fill(DictatorBrand.ink.opacity(0.62))
-                    .frame(width: size * 0.072, height: size * 0.072)
-                    .offset(x: size * 0.27, y: size * 0.02)
+                SparkleStar(size: size * 0.086)
+                    .fill(DictatorBrand.ink.opacity(0.68))
+                    .frame(width: size * 0.086, height: size * 0.086)
+                    .offset(x: size * 0.29, y: -size * 0.01)
             }
         }
         .frame(width: size, height: size)

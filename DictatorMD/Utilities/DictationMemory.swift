@@ -10,6 +10,7 @@ struct DictationHistoryItem: Identifiable, Codable, Equatable {
     let bundleIdentifier: String
     let audioDuration: Double
     let wordCount: Int
+    let cleanupCutCount: Int?
 }
 
 struct LearnedTerm: Identifiable, Codable, Equatable {
@@ -40,7 +41,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
         load()
     }
 
-    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double) {
+    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double, cleanupCutCount: Int = 0) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -52,7 +53,8 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             appName: targetApp?.localizedName ?? "Unknown",
             bundleIdentifier: targetApp?.bundleIdentifier ?? "",
             audioDuration: audioDuration,
-            wordCount: Self.wordCount(in: trimmed)
+            wordCount: Self.wordCount(in: trimmed),
+            cleanupCutCount: cleanupCutCount
         )
 
         let candidates = Self.extractCandidateTerms(from: trimmed)
@@ -152,6 +154,26 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
 
     private static func wordCount(in text: String) -> Int {
         text.split { $0.isWhitespace || $0.isNewline }.count
+    }
+
+    static func estimatedCleanupCutCount(raw: String, final: String) -> Int {
+        let rawFillers = fillerCount(in: raw)
+        let finalFillers = fillerCount(in: final)
+        let removedFillers = max(0, rawFillers - finalFillers)
+        let removedWords = max(0, wordCount(in: raw) - wordCount(in: final))
+        return removedFillers + min(removedWords, 4)
+    }
+
+    private static func fillerCount(in text: String) -> Int {
+        let lower = text.lowercased()
+        let phraseFillers = ["you know", "i mean"].reduce(0) { count, phrase in
+            count + lower.components(separatedBy: phrase).count - 1
+        }
+        let tokens = lower
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { !$0.isEmpty }
+        let fillerTokens: Set<String> = ["um", "umm", "uh", "uhh", "uuh", "erm", "er", "мм", "ъм", "ъъ", "ами", "значи"]
+        return phraseFillers + tokens.filter { fillerTokens.contains($0) }.count
     }
 
     private static func extractCandidateTerms(from text: String) -> [String] {

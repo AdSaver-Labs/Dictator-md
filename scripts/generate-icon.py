@@ -69,8 +69,8 @@ func renderIcon(size: Int) -> NSImage {
     ctx.clip()
 
     let yellowColors = [
-        CGColor(red: 1.00, green: 0.91, blue: 0.35, alpha: 1.0),
-        CGColor(red: 1.00, green: 0.73, blue: 0.10, alpha: 1.0),
+        CGColor(red: 0.98, green: 0.77, blue: 0.16, alpha: 1.0),
+        CGColor(red: 0.92, green: 0.61, blue: 0.06, alpha: 1.0),
     ]
     let yellowGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: yellowColors as CFArray, locations: [0.0, 1.0])!
     ctx.drawLinearGradient(
@@ -86,11 +86,11 @@ func renderIcon(size: Int) -> NSImage {
 
     let center = CGPoint(x: tile.midX, y: tile.midY)
     let ink = CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 1.0)
-    let symbolPointSize = tile.width * 0.40
+    let symbolPointSize = tile.width * 0.45
     let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .bold)
     if let symbol = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: nil)?
         .withSymbolConfiguration(symbolConfig) {
-        let symbolHeight = tile.width * 0.42
+        let symbolHeight = tile.width * 0.47
         let aspect = max(0.35, symbol.size.width / max(symbol.size.height, 1))
         let symbolWidth = symbolHeight * aspect
         let symbolRect = CGRect(
@@ -100,6 +100,11 @@ func renderIcon(size: Int) -> NSImage {
             height: symbolHeight
         )
         NSGraphicsContext.saveGraphicsState()
+        let transform = NSAffineTransform()
+        transform.translateX(by: symbolRect.midX, yBy: symbolRect.midY)
+        transform.rotate(byDegrees: -5)
+        transform.translateX(by: -symbolRect.midX, yBy: -symbolRect.midY)
+        transform.concat()
         NSColor(cgColor: ink)?.set()
         symbol.isTemplate = true
         symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1.0)
@@ -107,13 +112,13 @@ func renderIcon(size: Int) -> NSImage {
     }
 
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.88))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.66, y: tile.minY + tile.height * 0.62), radius: tile.width * 0.062))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.68, y: tile.minY + tile.height * 0.64), radius: tile.width * 0.069))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.72))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.78, y: tile.minY + tile.height * 0.74), radius: tile.width * 0.032))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.80, y: tile.minY + tile.height * 0.75), radius: tile.width * 0.039))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.68))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.77, y: tile.minY + tile.height * 0.48), radius: tile.width * 0.036))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.79, y: tile.minY + tile.height * 0.51), radius: tile.width * 0.043))
     ctx.fillPath()
 
     img.unlockFocus()
