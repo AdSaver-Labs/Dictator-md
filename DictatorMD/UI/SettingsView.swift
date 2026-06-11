@@ -228,28 +228,19 @@ struct SettingsView: View {
     private var detailPane: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(selectedSection.displayName)
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                        Text(sectionSubtitle)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 18) {
+                        sectionTitleBlock
+                        Spacer(minLength: 16)
+                        headerAccessory
                     }
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(engine.state == .recording ? .red : (engine.isModelLoaded ? AppTheme.readyGreen : .orange))
-                            .frame(width: 8, height: 8)
-                        Text(engine.state == .idle ? (engine.isModelLoaded ? "Ready" : "Loading") : engine.state.rawValue.capitalized)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionTitleBlock
+                        headerAccessory
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Capsule().fill(colorScheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.70)))
                 }
-                .padding(.bottom, 18)
+                .padding(.bottom, selectedSection == .dashboard ? 24 : 18)
 
                 switch selectedSection {
                 case .dashboard:
@@ -271,6 +262,35 @@ struct SettingsView: View {
             .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var sectionTitleBlock: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(selectedSection.displayName)
+                .font(.system(size: selectedSection == .dashboard ? 28 : 24, weight: .bold, design: .rounded))
+            Text(sectionSubtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var headerAccessory: some View {
+        if selectedSection == .dashboard {
+            DashboardTopController(language: settings.dictationLanguage, colorScheme: colorScheme)
+        } else {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(engine.state == .recording ? .red : (engine.isModelLoaded ? AppTheme.readyGreen : .orange))
+                    .frame(width: 8, height: 8)
+                Text(engine.state == .idle ? (engine.isModelLoaded ? "Ready" : "Loading") : engine.state.rawValue.capitalized)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(colorScheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.70)))
+        }
     }
 
     private var sectionSubtitle: String {
@@ -434,68 +454,102 @@ private struct DashboardSection: View {
     @ObservedObject var settings: AppSettings
     let engine: DictationEngine
     let colorScheme: ColorScheme
+    @State private var availableWidth: CGFloat = 0
 
     private var calendar: Calendar { .current }
 
     var body: some View {
         VStack(spacing: 16) {
-            DashboardTopController(language: settings.dictationLanguage, colorScheme: colorScheme)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.top, -30)
-                .padding(.trailing, 4)
-                .padding(.bottom, 6)
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 12)], spacing: 12) {
-                ConceptMetricCard(title: "Today's Words", value: formatted(wordsToday), trend: "+18% vs yesterday", icon: "doc.text", color: AppTheme.readyGreen, colorScheme: colorScheme)
-                ConceptMetricCard(title: "Weekly Words", value: formatted(wordsThisWeek), trend: "+12% vs last week", icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0), colorScheme: colorScheme)
-                ConceptMetricCard(title: "Average WPM", value: "\(averageWPMThisWeek)", trend: "+6% vs last week", icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95), colorScheme: colorScheme)
-                ConceptMetricCard(title: "New Vocabulary", value: "\(newTermsThisWeek)", trend: "+8% vs last week", icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12), colorScheme: colorScheme)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 12) {
-                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
-                        .frame(minWidth: 340)
-
-                    ConceptSystemCard(
-                        selectedModel: settings.selectedModel,
-                        language: settings.dictationLanguage,
-                        modelLoaded: engine.isModelLoaded,
-                        colorScheme: colorScheme
-                    )
-                    .frame(width: 250)
-
-                    ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
-                        .frame(width: 300)
-                }
-
-                VStack(spacing: 12) {
-                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
-                    HStack(alignment: .top, spacing: 12) {
-                        ConceptSystemCard(
-                            selectedModel: settings.selectedModel,
-                            language: settings.dictationLanguage,
-                            modelLoaded: engine.isModelLoaded,
-                            colorScheme: colorScheme
-                        )
-
-                        ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
-                    }
-                }
-
-                VStack(spacing: 12) {
-                    ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
-                    ConceptSystemCard(
-                        selectedModel: settings.selectedModel,
-                        language: settings.dictationLanguage,
-                        modelLoaded: engine.isModelLoaded,
-                        colorScheme: colorScheme
-                    )
-                    ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
-                }
-            }
+            metricCards
+            dashboardPanels
 
             ConceptPrivacyStrip(colorScheme: colorScheme)
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        updateAvailableWidth(proxy.size.width)
+                    }
+                    .onChange(of: proxy.size.width) { _, width in
+                        updateAvailableWidth(width)
+                    }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var metricCards: some View {
+        let cards = [
+            DashboardMetricDescriptor(title: "Today's Words", value: formatted(wordsToday), trend: "+18% vs yesterday", icon: "doc.text", color: AppTheme.readyGreen),
+            DashboardMetricDescriptor(title: "Weekly Words", value: formatted(wordsThisWeek), trend: "+12% vs last week", icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0)),
+            DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPMThisWeek)", trend: "+6% vs last week", icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95)),
+            DashboardMetricDescriptor(title: "New Vocabulary", value: "\(newTermsThisWeek)", trend: "+8% vs last week", icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12))
+        ]
+
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: metricColumnCount), spacing: 12) {
+            ForEach(cards) { card in
+                ConceptMetricCard(descriptor: card, colorScheme: colorScheme)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var dashboardPanels: some View {
+        if availableWidth >= 900 {
+            HStack(alignment: .top, spacing: 12) {
+                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                    .frame(maxWidth: .infinity)
+
+                ConceptSystemCard(
+                    selectedModel: settings.selectedModel,
+                    language: settings.dictationLanguage,
+                    modelLoaded: engine.isModelLoaded,
+                    colorScheme: colorScheme
+                )
+                .frame(width: 270)
+
+                ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                    .frame(width: 320)
+            }
+        } else if availableWidth >= 620 {
+            VStack(spacing: 12) {
+                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                HStack(alignment: .top, spacing: 12) {
+                    ConceptSystemCard(
+                        selectedModel: settings.selectedModel,
+                        language: settings.dictationLanguage,
+                        modelLoaded: engine.isModelLoaded,
+                        colorScheme: colorScheme
+                    )
+
+                    ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+                }
+            }
+        } else {
+            VStack(spacing: 12) {
+                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                ConceptSystemCard(
+                    selectedModel: settings.selectedModel,
+                    language: settings.dictationLanguage,
+                    modelLoaded: engine.isModelLoaded,
+                    colorScheme: colorScheme
+                )
+                ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
+            }
+        }
+    }
+
+    private var metricColumnCount: Int {
+        if availableWidth >= 860 { return 4 }
+        if availableWidth >= 520 { return 2 }
+        return 1
+    }
+
+    private func updateAvailableWidth(_ width: CGFloat) {
+        guard abs(width - availableWidth) > 1 else { return }
+        DispatchQueue.main.async {
+            availableWidth = width
         }
     }
 
@@ -725,39 +779,49 @@ private struct DashboardTopController: View {
     }
 }
 
-private struct ConceptMetricCard: View {
+private struct DashboardMetricDescriptor: Identifiable {
+    var id: String { title }
     let title: String
     let value: String
     let trend: String
     let icon: String
     let color: Color
+}
+
+private struct ConceptMetricCard: View {
+    let descriptor: DashboardMetricDescriptor
     let colorScheme: ColorScheme
 
     var body: some View {
         ConceptPanel(colorScheme: colorScheme) {
-            HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(color)
-                    .frame(width: 50, height: 50)
-                    .background(Circle().fill(color.opacity(0.14)))
+            HStack(spacing: 12) {
+                Image(systemName: descriptor.icon)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(descriptor.color)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(descriptor.color.opacity(0.14)))
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(title)
-                        .font(.system(size: 14, weight: .semibold))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(descriptor.title)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
-                    Text(value)
-                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Text(descriptor.value)
+                        .font(.system(size: 23, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                    Label(trend, systemImage: "arrow.up")
-                        .font(.system(size: 11, weight: .semibold))
+                    Label(descriptor.trend, systemImage: "arrow.up")
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(AppTheme.readyGreen)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.66)
                 }
+                Spacer(minLength: 0)
             }
         }
-        .frame(minHeight: 112)
+        .frame(minHeight: 104, maxHeight: 104)
     }
 }
 
