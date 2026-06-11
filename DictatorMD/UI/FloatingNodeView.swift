@@ -126,27 +126,20 @@ struct FloatingNodeView: View {
         ZStack(alignment: .center) {
             if isHovering {
                 expandedNode
-                    .transition(.identity)
+                    .transition(.asymmetric(
+                        insertion: .offset(y: 8).combined(with: .scale(scale: 0.94, anchor: .bottom)),
+                        removal: .offset(y: 6).combined(with: .scale(scale: 0.96, anchor: .bottom))
+                    ))
             } else {
                 collapsedNode
-                    .transition(.identity)
+                    .transition(.asymmetric(
+                        insertion: .offset(y: -4).combined(with: .scale(scale: 0.96, anchor: .bottom)),
+                        removal: .offset(y: 6).combined(with: .scale(scale: 0.92, anchor: .bottom))
+                    ))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .contentShape(Capsule())
-        .onHover { hovering in
-            if hovering {
-                collapseWorkItem?.cancel()
-                collapseWorkItem = nil
-                animateHover(true)
-            } else {
-                let work = DispatchWorkItem {
-                    animateHover(false)
-                }
-                collapseWorkItem = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24, execute: work)
-            }
-        }
+        .animation(.interactiveSpring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.04), value: isHovering)
         .onChange(of: settings.floatingNodeEnabled) { _, enabled in
             if enabled {
                 FloatingNodeController.shared.show(engine: engine)
@@ -185,6 +178,10 @@ struct FloatingNodeView: View {
             }
             .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
             .padding(.bottom, 10)
+            .contentShape(Capsule())
+            .onHover { hovering in
+                handleHover(hovering)
+            }
             .accessibilityLabel("Dictation node")
             .onTapGesture {
                 DebugLog.shared.log("[FloatingNode] collapsed tapped")
@@ -211,6 +208,10 @@ struct FloatingNodeView: View {
         )
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.26 : 0.10), radius: 10, y: 4)
         .padding(.bottom, 5)
+        .contentShape(Capsule())
+        .onHover { hovering in
+            handleHover(hovering)
+        }
     }
 
     private var languageButton: some View {
@@ -309,6 +310,20 @@ struct FloatingNodeView: View {
     private func animateHover(_ hovering: Bool) {
         withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.92, blendDuration: 0.04)) {
             isHovering = hovering
+        }
+    }
+
+    private func handleHover(_ hovering: Bool) {
+        if hovering {
+            collapseWorkItem?.cancel()
+            collapseWorkItem = nil
+            animateHover(true)
+        } else {
+            let work = DispatchWorkItem {
+                animateHover(false)
+            }
+            collapseWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
         }
     }
 }

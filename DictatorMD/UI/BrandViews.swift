@@ -48,17 +48,17 @@ struct DictatorLogoMark: View {
                 SparkleStar(size: size * 0.125)
                     .fill(DictatorBrand.ink.opacity(0.88))
                     .frame(width: size * 0.125, height: size * 0.125)
-                    .offset(x: size * 0.34, y: -size * 0.33)
+                    .offset(x: size * 0.34, y: -size * 0.28)
 
-                SparkleStar(size: size * 0.088)
+                SparkleStar(size: size * 0.060)
                     .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.088, height: size * 0.088)
-                    .offset(x: size * 0.18, y: -size * 0.43)
+                    .frame(width: size * 0.060, height: size * 0.060)
+                    .offset(x: size * 0.20, y: -size * 0.36)
 
-                SparkleStar(size: size * 0.074)
+                SparkleStar(size: size * 0.082)
                     .fill(DictatorBrand.ink.opacity(0.62))
-                    .frame(width: size * 0.074, height: size * 0.074)
-                    .offset(x: size * 0.46, y: -size * 0.16)
+                    .frame(width: size * 0.082, height: size * 0.082)
+                    .offset(x: size * 0.45, y: -size * 0.08)
             }
         }
         .frame(width: size, height: size)
