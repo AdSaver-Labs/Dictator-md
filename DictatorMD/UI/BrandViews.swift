@@ -40,32 +40,27 @@ struct DictatorLogoMark: View {
                 )
 
             Image(systemName: "mic.fill")
-                .font(.system(size: size * 0.44, weight: .bold))
+                .font(.system(size: size * 0.38, weight: .bold))
                 .foregroundStyle(DictatorBrand.ink)
-                .rotationEffect(.degrees(-7))
 
             if showsStars {
                 SparkleStar(size: size * 0.124)
                     .fill(DictatorBrand.ink.opacity(0.88))
                     .frame(width: size * 0.124, height: size * 0.124)
-                    .offset(x: size * 0.35, y: -size * 0.17)
-
-                SparkleStar(size: size * 0.055)
-                    .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.055, height: size * 0.055)
-                    .offset(x: size * 0.24, y: -size * 0.29)
+                    .offset(x: size * 0.16, y: -size * 0.12)
 
                 SparkleStar(size: size * 0.064)
-                    .fill(DictatorBrand.ink.opacity(0.62))
+                    .fill(DictatorBrand.ink.opacity(0.72))
                     .frame(width: size * 0.064, height: size * 0.064)
-                    .offset(x: size * 0.39, y: -size * 0.37)
+                    .offset(x: size * 0.28, y: -size * 0.24)
+
+                SparkleStar(size: size * 0.072)
+                    .fill(DictatorBrand.ink.opacity(0.62))
+                    .frame(width: size * 0.072, height: size * 0.072)
+                    .offset(x: size * 0.27, y: size * 0.02)
             }
         }
         .frame(width: size, height: size)
-        .overlay(
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .stroke(DictatorBrand.ink.opacity(0.14), lineWidth: max(0.7, size * 0.018))
-        )
     }
 }
 

@@ -84,18 +84,13 @@ func renderIcon(size: Int) -> NSImage {
     ctx.fill(CGRect(x: tile.minX, y: tile.midY, width: tile.width, height: tile.height / 2))
     ctx.restoreGState()
 
-    ctx.addPath(roundedPath(tile.insetBy(dx: tile.width * 0.008, dy: tile.height * 0.008), tileRadius))
-    ctx.setStrokeColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.16))
-    ctx.setLineWidth(max(1, tile.width * 0.012))
-    ctx.strokePath()
-
     let center = CGPoint(x: tile.midX, y: tile.midY)
     let ink = CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 1.0)
-    let symbolPointSize = tile.width * 0.47
+    let symbolPointSize = tile.width * 0.40
     let symbolConfig = NSImage.SymbolConfiguration(pointSize: symbolPointSize, weight: .bold)
     if let symbol = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: nil)?
         .withSymbolConfiguration(symbolConfig) {
-        let symbolHeight = tile.width * 0.49
+        let symbolHeight = tile.width * 0.42
         let aspect = max(0.35, symbol.size.width / max(symbol.size.height, 1))
         let symbolWidth = symbolHeight * aspect
         let symbolRect = CGRect(
@@ -106,24 +101,19 @@ func renderIcon(size: Int) -> NSImage {
         )
         NSGraphicsContext.saveGraphicsState()
         NSColor(cgColor: ink)?.set()
-        let transform = NSAffineTransform()
-        transform.translateX(by: symbolRect.midX, yBy: symbolRect.midY)
-        transform.rotate(byDegrees: -7)
-        transform.translateX(by: -symbolRect.midX, yBy: -symbolRect.midY)
-        transform.concat()
         symbol.isTemplate = true
         symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1.0)
         NSGraphicsContext.restoreGraphicsState()
     }
 
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.88))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.85, y: tile.minY + tile.height * 0.67), radius: tile.width * 0.062))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.66, y: tile.minY + tile.height * 0.62), radius: tile.width * 0.062))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.72))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.74, y: tile.minY + tile.height * 0.79), radius: tile.width * 0.0275))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.78, y: tile.minY + tile.height * 0.74), radius: tile.width * 0.032))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.68))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.89, y: tile.minY + tile.height * 0.87), radius: tile.width * 0.032))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.77, y: tile.minY + tile.height * 0.48), radius: tile.width * 0.036))
     ctx.fillPath()
 
     img.unlockFocus()
