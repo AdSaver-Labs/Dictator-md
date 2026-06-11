@@ -168,7 +168,7 @@ struct FloatingNodeView: View {
     private var collapsedNode: some View {
         Capsule()
             .fill(statusColor.opacity(0.58))
-            .frame(width: isWorking ? 112 : 92, height: isWorking ? 6 : 5)
+            .frame(width: isWorking ? 74 : 92, height: isWorking ? 12 : 5)
             .background(
                 Capsule()
                     .fill(.ultraThinMaterial)
@@ -180,7 +180,7 @@ struct FloatingNodeView: View {
             )
             .overlay {
                 if isWorking {
-                    LoadingDots(color: .white, dotSize: 3.8, spacing: 4)
+                    LoadingDots(color: .white, dotSize: 3.6, spacing: 4)
                 }
             }
             .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
@@ -327,7 +327,7 @@ private struct LoadingDots: View {
                     Circle()
                         .fill(color.opacity(0.36 + phase * 0.64))
                         .frame(width: dotSize, height: dotSize)
-                        .offset(y: CGFloat(-phase * 3.0))
+                        .offset(y: CGFloat(-phase * 2.4))
                         .scaleEffect(0.82 + phase * 0.24)
                 }
             }

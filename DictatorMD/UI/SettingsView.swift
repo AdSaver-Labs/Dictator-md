@@ -278,7 +278,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var headerAccessory: some View {
         if selectedSection == .dashboard {
-            DashboardTopController(language: settings.dictationLanguage, colorScheme: colorScheme)
+            DashboardTopController(settings: settings, engine: engine, colorScheme: colorScheme)
         } else {
             HStack(spacing: 8) {
                 Circle()
@@ -519,7 +519,7 @@ private struct DashboardSection: View {
     private var dashboardPanels: some View {
         if availableWidth >= 900 {
             HStack(alignment: .top, spacing: 12) {
-                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
                     .frame(maxWidth: .infinity)
 
                 ConceptSystemCard(
@@ -535,7 +535,7 @@ private struct DashboardSection: View {
             }
         } else if availableWidth >= 620 {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
                 HStack(alignment: .top, spacing: 12) {
                     ConceptSystemCard(
                         selectedModel: settings.selectedModel,
@@ -549,7 +549,7 @@ private struct DashboardSection: View {
             }
         } else {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(days: weeklyBuckets, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
                 ConceptSystemCard(
                     selectedModel: settings.selectedModel,
                     language: settings.dictationLanguage,
@@ -734,40 +734,52 @@ private struct ConceptPanel<Content: View>: View {
 }
 
 private struct DashboardTopController: View {
-    let language: AppSettings.DictationLanguage
+    @ObservedObject var settings: AppSettings
+    let engine: DictationEngine
     let colorScheme: ColorScheme
 
     var body: some View {
         HStack(spacing: 11) {
-            Text("Auto")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(AppTheme.logoYellow)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.logoYellow.opacity(0.13)))
-            Text("EN")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text("BG")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+            languageChip(.auto, "Auto")
+            languageChip(.english, "EN")
+            languageChip(.bulgarian, "BG")
 
-            Image(systemName: "mic.fill")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(AppTheme.ink)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(AppTheme.brandGradient))
-                .overlay(Circle().stroke(Color.white.opacity(0.20), lineWidth: 3))
+            Button {
+                engine.toggleDictationFromUI()
+            } label: {
+                Image(systemName: micIcon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(engine.state == .idle ? AppTheme.ink : .white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(statusColor))
+                    .overlay(Circle().stroke(Color.white.opacity(0.20), lineWidth: 3))
+            }
+            .buttonStyle(.plain)
+            .help(engine.state == .recording ? "Stop dictation" : "Start dictation")
 
-            Image(systemName: "waveform")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(AppTheme.readyGreen.opacity(0.85))
+            Group {
+                if engine.state == .processing || engine.state == .typing {
+                    DashboardLoadingDots(color: statusColor, dotSize: 4.5, spacing: 4)
+                        .frame(width: 31, height: 31)
+                } else {
+                    Image(systemName: engine.state == .recording ? "waveform" : "waveform.path")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(statusColor.opacity(0.85))
+                        .frame(width: 31, height: 31)
+                }
+            }
 
-            Image(systemName: "arrow.up.forward")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 31, height: 31)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
+            Button {
+                SettingsWindowController.shared.show(engine: engine)
+            } label: {
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 31, height: 31)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(colorScheme == .dark ? 0.055 : 0.56)))
+            }
+            .buttonStyle(.plain)
+            .help("Open Dictator-md")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -783,11 +795,61 @@ private struct DashboardTopController: View {
         .accessibilityLabel("Floating dictation controller preview")
     }
 
-    private var shortLanguage: String {
-        switch language {
-        case .auto: return "Auto"
-        case .english: return "EN"
-        case .bulgarian: return "BG"
+    private func languageChip(_ language: AppSettings.DictationLanguage, _ label: String) -> some View {
+        Button {
+            settings.dictationLanguage = language
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(settings.dictationLanguage == language ? AppTheme.logoYellow : .secondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(settings.dictationLanguage == language ? AppTheme.logoYellow.opacity(0.13) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Set language to \(language.label)")
+    }
+
+    private var statusColor: Color {
+        switch engine.state {
+        case .idle: return engine.isModelLoaded ? AppTheme.logoYellow : .orange
+        case .recording: return .red
+        case .processing: return AppTheme.cyan
+        case .typing: return Color(red: 0.38, green: 0.62, blue: 1.0)
+        }
+    }
+
+    private var micIcon: String {
+        switch engine.state {
+        case .idle: return "mic.fill"
+        case .recording: return "stop.fill"
+        case .processing: return "brain.head.profile.fill"
+        case .typing: return "text.cursor"
+        }
+    }
+}
+
+private struct DashboardLoadingDots: View {
+    let color: Color
+    let dotSize: CGFloat
+    let spacing: CGFloat
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            HStack(spacing: spacing) {
+                ForEach(0..<3, id: \.self) { index in
+                    let phase = (sin((time * 5.2) - Double(index) * 0.72) + 1) / 2
+                    Circle()
+                        .fill(color.opacity(0.36 + phase * 0.64))
+                        .frame(width: dotSize, height: dotSize)
+                        .offset(y: CGFloat(-phase * 2.4))
+                        .scaleEffect(0.82 + phase * 0.24)
+                }
+            }
         }
     }
 }
@@ -838,10 +900,37 @@ private struct ConceptMetricCard: View {
     }
 }
 
+private enum ActivityRange: String, CaseIterable, Identifiable {
+    case thisWeek = "This week"
+    case lastSevenDays = "Last 7 days"
+    case thisMonth = "This month"
+
+    var id: String { rawValue }
+}
+
 private struct ConceptWeeklyActivityCard: View {
-    let days: [DailyWordBucket]
+    let history: [DictationHistoryItem]
     let colorScheme: ColorScheme
     @State private var focusedDay: Date?
+    @State private var selectedRange: ActivityRange = .thisWeek
+
+    private var calendar: Calendar { .current }
+    private var days: [DailyWordBucket] {
+        switch selectedRange {
+        case .thisWeek:
+            let start = mondayStart(for: Date())
+            let end = calendar.date(byAdding: .day, value: 6, to: start) ?? Date()
+            return dailyBuckets(startingAt: start, endingAt: end, calendar: calendar, history: history)
+        case .lastSevenDays:
+            let today = calendar.startOfDay(for: Date())
+            let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+            return dailyBuckets(startingAt: start, endingAt: today, calendar: calendar, history: history)
+        case .thisMonth:
+            guard let interval = calendar.dateInterval(of: .month, for: Date()) else { return [] }
+            let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? Date()
+            return dailyBuckets(startingAt: interval.start, endingAt: end, calendar: calendar, history: history)
+        }
+    }
 
     private var maxWords: Int {
         max(days.map(\.words).max() ?? 0, 1)
@@ -849,22 +938,28 @@ private struct ConceptWeeklyActivityCard: View {
 
     var body: some View {
         ConceptPanel(colorScheme: colorScheme) {
-            HStack {
-                Text("Weekly Activity")
-                    .font(.system(size: 15, weight: .semibold))
-                Spacer()
-                Menu("Words") {}
-                    .font(.system(size: 12, weight: .semibold))
-                    .menuStyle(.borderlessButton)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    Text(selectedRange == .thisMonth ? "Monthly Activity" : "Weekly Activity")
+                        .font(.system(size: 15, weight: .semibold))
+                    Spacer()
+                    rangeButtons
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(selectedRange == .thisMonth ? "Monthly Activity" : "Weekly Activity")
+                        .font(.system(size: 15, weight: .semibold))
+                    rangeButtons
+                }
             }
 
             HStack(alignment: .bottom, spacing: 10) {
                 VStack(alignment: .trailing) {
-                    Text("6K")
+                    Text(axisLabel(1.0))
                     Spacer()
-                    Text("4K")
+                    Text(axisLabel(0.66))
                     Spacer()
-                    Text("2K")
+                    Text(axisLabel(0.33))
                     Spacer()
                     Text("0")
                 }
@@ -872,57 +967,9 @@ private struct ConceptWeeklyActivityCard: View {
                 .foregroundStyle(.secondary)
                 .frame(height: 210)
 
-                HStack(alignment: .bottom, spacing: 12) {
+                HStack(alignment: .bottom, spacing: selectedRange == .thisMonth ? 5 : 12) {
                     ForEach(days) { day in
-                        let isToday = day.date == Calendar.current.startOfDay(for: Date())
-                        let isFocused = focusedDay == day.date
-                        VStack(spacing: 8) {
-                            VStack(spacing: 2) {
-                                Text(compactWords(day.words))
-                                    .font(.system(size: isFocused ? 11 : 10, weight: .semibold))
-                                if isFocused {
-                                    Text("\(day.dictations) captures")
-                                        .font(.system(size: 8, weight: .medium))
-                                }
-                            }
-                            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(isFocused ? AppTheme.logoYellow.opacity(0.12) : .clear)
-                            )
-                            .animation(.easeOut(duration: 0.16), value: isFocused)
-
-                            RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
-                                .fill(isToday || isFocused ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
-                                .frame(width: isFocused ? 25 : 23, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 126 : 120)))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
-                                        .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.52 : 0), lineWidth: 1)
-                                )
-                                .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.24 : 0.10), radius: isFocused ? 8 : 5)
-                            VStack(spacing: 1) {
-                                Text(Self.dayFormatter.string(from: day.date))
-                                    .font(.system(size: 10, weight: isFocused ? .bold : .medium))
-                                Text(Self.dateFormatter.string(from: day.date))
-                                    .font(.system(size: 8, weight: .medium))
-                                    .monospacedDigit()
-                            }
-                            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
-                        .onHover { hovering in
-                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
-                                focusedDay = hovering ? day.date : (focusedDay == day.date ? nil : focusedDay)
-                            }
-                        }
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
-                                focusedDay = focusedDay == day.date ? nil : day.date
-                            }
-                        }
+                        dayColumn(day)
                     }
                 }
                 .frame(height: 230)
@@ -935,6 +982,84 @@ private struct ConceptWeeklyActivityCard: View {
             }
         }
         .frame(minHeight: 330)
+    }
+
+    private var rangeButtons: some View {
+        HStack(spacing: 6) {
+            ForEach(ActivityRange.allCases) { range in
+                Button {
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        selectedRange = range
+                        focusedDay = nil
+                    }
+                } label: {
+                    Text(range.rawValue)
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(selectedRange == range ? AppTheme.logoYellow.opacity(0.18) : Color.white.opacity(colorScheme == .dark ? 0.055 : 0.48))
+                        )
+                        .foregroundStyle(selectedRange == range ? AppTheme.logoYellowSoft : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func dayColumn(_ day: DailyWordBucket) -> some View {
+        let isToday = day.date == calendar.startOfDay(for: Date())
+        let isFocused = focusedDay == day.date
+        let isMonth = selectedRange == .thisMonth
+
+        return VStack(spacing: isMonth ? 5 : 8) {
+            VStack(spacing: 2) {
+                Text(compactWords(day.words))
+                    .font(.system(size: isFocused ? 10 : 9, weight: .semibold))
+                if isFocused && !isMonth {
+                    Text("\(day.dictations) captures")
+                        .font(.system(size: 8, weight: .medium))
+                }
+            }
+            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+            .padding(.horizontal, isFocused ? 5 : 2)
+            .padding(.vertical, isFocused ? 3 : 1)
+            .background(Capsule().fill(isFocused ? AppTheme.logoYellow.opacity(0.12) : .clear))
+
+            RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
+                .fill(isToday || isFocused ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
+                .frame(width: isMonth ? (isFocused ? 13 : 9) : (isFocused ? 25 : 23), height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 126 : 120)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
+                        .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.52 : 0), lineWidth: 1)
+                )
+                .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.24 : 0.10), radius: isFocused ? 8 : 5)
+
+            VStack(spacing: 1) {
+                Text(isMonth ? Self.dayNumberFormatter.string(from: day.date) : Self.dayFormatter.string(from: day.date))
+                    .font(.system(size: isMonth ? 8 : 10, weight: isFocused ? .bold : .medium))
+                if !isMonth {
+                    Text(Self.dateFormatter.string(from: day.date))
+                        .font(.system(size: 8, weight: .medium))
+                        .monospacedDigit()
+                }
+            }
+            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                focusedDay = hovering ? day.date : (focusedDay == day.date ? nil : focusedDay)
+            }
+        }
+        .onTapGesture {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                focusedDay = focusedDay == day.date ? nil : day.date
+            }
+        }
+        .help("\(compactWords(day.words)) words, \(day.dictations) dictations")
     }
 
     private func compactWords(_ words: Int) -> String {
@@ -955,6 +1080,23 @@ private struct ConceptWeeklyActivityCard: View {
         formatter.dateFormat = "d MMM"
         return formatter
     }()
+
+    private static let dayNumberFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+
+    private func axisLabel(_ ratio: Double) -> String {
+        compactWords(Int((Double(maxWords) * ratio).rounded()))
+    }
+
+    private func mondayStart(for date: Date) -> Date {
+        let start = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: start)
+        let daysFromMonday = (weekday + 5) % 7
+        return calendar.date(byAdding: .day, value: -daysFromMonday, to: start) ?? start
+    }
 }
 
 private struct ConceptSystemCard: View {
@@ -1486,7 +1628,7 @@ private struct WeeklyWordBars: View {
     let colorScheme: ColorScheme
 
     var body: some View {
-        ConceptWeeklyActivityCard(days: days, colorScheme: colorScheme)
+        ConceptWeeklyActivityCard(history: DictationMemory.shared.history, colorScheme: colorScheme)
             .frame(minHeight: 330)
     }
 }
