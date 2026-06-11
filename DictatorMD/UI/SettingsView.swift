@@ -905,37 +905,44 @@ private struct HistoryMetricCard: View {
     let colorScheme: ColorScheme
 
     var body: some View {
-        ConceptPanel(colorScheme: colorScheme) {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(alignment: .center, spacing: 9) {
-                    Image(systemName: descriptor.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(descriptor.color)
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(descriptor.color.opacity(0.15)))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 9) {
+                Image(systemName: descriptor.icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(descriptor.color)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(descriptor.color.opacity(0.15)))
 
-                    Text(descriptor.title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                }
-
-                Text(descriptor.value)
-                    .font(.system(size: 25, weight: .bold, design: .rounded))
-                    .monospacedDigit()
+                Text(descriptor.title)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
-
-                Label(descriptor.trend, systemImage: "arrow.up")
-                    .font(.system(size: descriptor.trend.contains("%") ? 12 : 11, weight: .semibold))
-                    .foregroundStyle(AppTheme.logoYellow)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(descriptor.value)
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            Label(descriptor.trend, systemImage: "arrow.up")
+                .font(.system(size: descriptor.trend.contains("%") ? 12 : 11, weight: .semibold))
+                .foregroundStyle(AppTheme.logoYellow)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
         }
-        .frame(minHeight: 106, maxHeight: 106)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.72))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.05), radius: 11, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72), lineWidth: 1)
+        )
     }
 }
 
