@@ -900,6 +900,45 @@ private struct ConceptMetricCard: View {
     }
 }
 
+private struct HistoryMetricCard: View {
+    let descriptor: DashboardMetricDescriptor
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        ConceptPanel(colorScheme: colorScheme) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 9) {
+                    Image(systemName: descriptor.icon)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(descriptor.color)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(descriptor.color.opacity(0.15)))
+
+                    Text(descriptor.title)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+
+                Text(descriptor.value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+
+                Label(descriptor.trend, systemImage: "arrow.up")
+                    .font(.system(size: descriptor.trend.contains("%") ? 12 : 10, weight: .semibold))
+                    .foregroundStyle(AppTheme.logoYellow)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: 122, maxHeight: 122)
+    }
+}
+
 private enum ActivityRange: String, CaseIterable, Identifiable {
     case thisWeek = "This week"
     case lastSevenDays = "Last 7 days"
@@ -2257,36 +2296,16 @@ private struct HistorySection: View {
     let colorScheme: ColorScheme
     @State private var isActivityExpanded = false
     @State private var selectedActivityMonth = Date()
+    @State private var availableWidth: CGFloat = 0
 
     private var calendar: Calendar { .current }
 
     var body: some View {
         VStack(spacing: 14) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Dictations", value: "\(memory.history.count)", trend: "stored locally", icon: "mic.badge.plus", color: AppTheme.logoYellow),
-                    colorScheme: colorScheme
-                )
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Total Words", value: "\(totalWords)", trend: "all-time memory", icon: "text.word.spacing", color: AppTheme.readyGreen),
-                    colorScheme: colorScheme
-                )
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPM)", trend: "speech speed", icon: "gauge.with.dots.needle.67percent", color: AppTheme.cyan),
-                    colorScheme: colorScheme
-                )
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Learned Terms", value: "\(memory.learnedTerms.count)", trend: "vocabulary bias", icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
-                    colorScheme: colorScheme
-                )
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Cleanup Cuts", value: "\(cleanupCuts)", trend: "fillers removed", icon: "wand.and.stars", color: Color(red: 0.74, green: 0.48, blue: 1.0)),
-                    colorScheme: colorScheme
-                )
-                ConceptMetricCard(
-                    descriptor: DashboardMetricDescriptor(title: "Time Saved", value: timeSavedLabel, trend: "vs typing", icon: "clock.badge.checkmark", color: Color(red: 0.95, green: 0.45, blue: 0.28)),
-                    colorScheme: colorScheme
-                )
+            LazyVGrid(columns: historyMetricColumns, spacing: 12) {
+                ForEach(historyMetricCards) { card in
+                    HistoryMetricCard(descriptor: card, colorScheme: colorScheme)
+                }
             }
 
             SettingsCard(colorScheme: colorScheme) {
@@ -2388,6 +2407,47 @@ private struct HistorySection: View {
                 }
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        updateAvailableWidth(proxy.size.width)
+                    }
+                    .onChange(of: proxy.size.width) { _, width in
+                        updateAvailableWidth(width)
+                    }
+            }
+        )
+    }
+
+    private var historyMetricCards: [DashboardMetricDescriptor] {
+        [
+            DashboardMetricDescriptor(title: "Dictations", value: "\(memory.history.count)", trend: "stored locally", icon: "mic.badge.plus", color: AppTheme.logoYellow),
+            DashboardMetricDescriptor(title: "Total Words", value: formatted(totalWords), trend: "all-time memory", icon: "text.word.spacing", color: AppTheme.readyGreen),
+            DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPM)", trend: "speech speed", icon: "gauge.with.dots.needle.67percent", color: AppTheme.cyan),
+            DashboardMetricDescriptor(title: "Learned Terms", value: "\(memory.learnedTerms.count)", trend: "vocabulary bias", icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
+            DashboardMetricDescriptor(title: "Cleanup Cuts", value: "\(cleanupCuts)", trend: "fillers removed", icon: "wand.and.stars", color: Color(red: 0.74, green: 0.48, blue: 1.0)),
+            DashboardMetricDescriptor(title: "Time Saved", value: timeSavedLabel, trend: "vs typing", icon: "clock.badge.checkmark", color: Color(red: 0.95, green: 0.45, blue: 0.28))
+        ]
+    }
+
+    private var historyMetricColumns: [GridItem] {
+        let count: Int
+        if availableWidth >= 960 {
+            count = 6
+        } else if availableWidth >= 640 {
+            count = 3
+        } else if availableWidth >= 420 {
+            count = 2
+        } else {
+            count = 1
+        }
+        return Array(repeating: GridItem(.flexible(minimum: 0, maximum: .infinity), spacing: 12), count: count)
+    }
+
+    private func updateAvailableWidth(_ width: CGFloat) {
+        guard abs(width - availableWidth) > 1 else { return }
+        availableWidth = width
     }
 
     private var totalWords: Int {
@@ -2411,6 +2471,12 @@ private struct HistorySection: View {
             return String(format: "%.1fh", Double(minutes) / 60.0)
         }
         return "\(minutes)m"
+    }
+
+    private func formatted(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
     private var currentWeekBuckets: [DailyWordBucket] {
