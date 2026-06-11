@@ -906,36 +906,36 @@ private struct HistoryMetricCard: View {
 
     var body: some View {
         ConceptPanel(colorScheme: colorScheme) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .center, spacing: 9) {
                     Image(systemName: descriptor.icon)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(descriptor.color)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 34, height: 34)
                         .background(Circle().fill(descriptor.color.opacity(0.15)))
 
                     Text(descriptor.title)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.82)
                 }
 
                 Text(descriptor.value)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 25, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                    .minimumScaleFactor(0.82)
 
                 Label(descriptor.trend, systemImage: "arrow.up")
-                    .font(.system(size: descriptor.trend.contains("%") ? 12 : 10, weight: .semibold))
+                    .font(.system(size: descriptor.trend.contains("%") ? 12 : 11, weight: .semibold))
                     .foregroundStyle(AppTheme.logoYellow)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minHeight: 122, maxHeight: 122)
+        .frame(minHeight: 106, maxHeight: 106)
     }
 }
 
@@ -2435,7 +2435,7 @@ private struct HistorySection: View {
         let count: Int
         if availableWidth >= 960 {
             count = 6
-        } else if availableWidth >= 640 {
+        } else if availableWidth >= 520 {
             count = 3
         } else if availableWidth >= 420 {
             count = 2
