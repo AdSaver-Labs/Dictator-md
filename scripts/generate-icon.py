@@ -117,13 +117,13 @@ func renderIcon(size: Int) -> NSImage {
     }
 
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.88))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.84, y: tile.minY + tile.height * 0.78), radius: tile.width * 0.0625))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.85, y: tile.minY + tile.height * 0.67), radius: tile.width * 0.062))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.72))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.70, y: tile.minY + tile.height * 0.86), radius: tile.width * 0.030))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.74, y: tile.minY + tile.height * 0.79), radius: tile.width * 0.0275))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.68))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.95, y: tile.minY + tile.height * 0.58), radius: tile.width * 0.041))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.89, y: tile.minY + tile.height * 0.87), radius: tile.width * 0.032))
     ctx.fillPath()
 
     img.unlockFocus()

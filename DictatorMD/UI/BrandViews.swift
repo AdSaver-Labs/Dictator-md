@@ -45,20 +45,20 @@ struct DictatorLogoMark: View {
                 .rotationEffect(.degrees(-7))
 
             if showsStars {
-                SparkleStar(size: size * 0.125)
+                SparkleStar(size: size * 0.124)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .frame(width: size * 0.125, height: size * 0.125)
-                    .offset(x: size * 0.34, y: -size * 0.28)
+                    .frame(width: size * 0.124, height: size * 0.124)
+                    .offset(x: size * 0.35, y: -size * 0.17)
 
-                SparkleStar(size: size * 0.060)
+                SparkleStar(size: size * 0.055)
                     .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.060, height: size * 0.060)
-                    .offset(x: size * 0.20, y: -size * 0.36)
+                    .frame(width: size * 0.055, height: size * 0.055)
+                    .offset(x: size * 0.24, y: -size * 0.29)
 
-                SparkleStar(size: size * 0.082)
+                SparkleStar(size: size * 0.064)
                     .fill(DictatorBrand.ink.opacity(0.62))
-                    .frame(width: size * 0.082, height: size * 0.082)
-                    .offset(x: size * 0.45, y: -size * 0.08)
+                    .frame(width: size * 0.064, height: size * 0.064)
+                    .offset(x: size * 0.39, y: -size * 0.37)
             }
         }
         .frame(width: size, height: size)

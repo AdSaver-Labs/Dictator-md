@@ -997,7 +997,7 @@ private struct ConceptWeeklyActivityCard: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.08))
                         .frame(height: 1)
-                        .offset(y: -22)
+                        .offset(y: -36)
                 }
             }
             .transition(.opacity)
@@ -1031,25 +1031,23 @@ private struct ConceptWeeklyActivityCard: View {
     private func dayColumn(_ day: DailyWordBucket) -> some View {
         let isToday = day.date == calendar.startOfDay(for: Date())
         let isFocused = focusedDay == day.date
-        let isMonth = selectedRange == .thisMonth
-
-        return VStack(spacing: isMonth ? 5 : 8) {
+        return VStack(spacing: 8) {
             VStack(spacing: 2) {
                 Text(compactWords(day.words))
-                    .font(.system(size: isFocused ? 10 : 9, weight: .semibold))
-                if isFocused && !isMonth {
-                    Text("\(day.dictations) captures")
-                        .font(.system(size: 8, weight: .medium))
-                }
+                    .font(.system(size: 10, weight: isFocused ? .bold : .semibold))
+                Text("\(day.dictations) captures")
+                    .font(.system(size: 8, weight: .medium))
+                    .opacity(isFocused ? 1 : 0)
             }
             .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
-            .padding(.horizontal, isFocused ? 5 : 2)
-            .padding(.vertical, isFocused ? 3 : 1)
+            .frame(height: 29)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
             .background(Capsule().fill(isFocused ? AppTheme.logoYellow.opacity(0.12) : .clear))
 
             RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
                 .fill(isToday || isFocused ? AppTheme.selectedGradient : LinearGradient(colors: [AppTheme.logoYellow.opacity(0.35), AppTheme.logoYellow.opacity(0.12)], startPoint: .top, endPoint: .bottom))
-                .frame(width: isMonth ? (isFocused ? 13 : 9) : (isFocused ? 25 : 23), height: max(16, CGFloat(day.words) / CGFloat(maxWords) * (isFocused ? 126 : 120)))
+                .frame(width: 29, height: max(16, CGFloat(day.words) / CGFloat(maxWords) * 120))
                 .overlay(
                     RoundedRectangle(cornerRadius: isFocused ? 8 : 6)
                         .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.52 : 0), lineWidth: 1)
@@ -1057,15 +1055,14 @@ private struct ConceptWeeklyActivityCard: View {
                 .shadow(color: AppTheme.logoYellow.opacity(isFocused || isToday ? 0.24 : 0.10), radius: isFocused ? 8 : 5)
 
             VStack(spacing: 1) {
-                Text(isMonth ? Self.dayNumberFormatter.string(from: day.date) : Self.dayFormatter.string(from: day.date))
-                    .font(.system(size: isMonth ? 8 : 10, weight: isFocused ? .bold : .medium))
-                if !isMonth {
-                    Text(Self.dateFormatter.string(from: day.date))
-                        .font(.system(size: 8, weight: .medium))
-                        .monospacedDigit()
-                }
+                Text(Self.dayFormatter.string(from: day.date))
+                    .font(.system(size: 10, weight: isFocused ? .bold : .medium))
+                Text(Self.dateFormatter.string(from: day.date))
+                    .font(.system(size: 8, weight: .medium))
+                    .monospacedDigit()
             }
             .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
@@ -2265,18 +2262,23 @@ private struct HistorySection: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            SettingsCard(colorScheme: colorScheme) {
-                CardHeader("Self-Learning", subtitle: "Local memory built from your successful dictations")
-                HStack(spacing: 14) {
-                    StatBlock(value: "\(memory.history.count)", label: "dictations")
-                    StatBlock(value: "\(totalWords)", label: "words")
-                    StatBlock(value: "\(averageWPM)", label: "avg wpm")
-                    StatBlock(value: "\(memory.learnedTerms.count)", label: "learned terms")
-                }
-
-                Text("The app uses repeated learned terms to bias future transcription prompts. Everything stays on this Mac.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Dictations", value: "\(memory.history.count)", trend: "stored locally", icon: "mic.badge.plus", color: AppTheme.logoYellow),
+                    colorScheme: colorScheme
+                )
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Total Words", value: "\(totalWords)", trend: "all-time memory", icon: "text.word.spacing", color: AppTheme.readyGreen),
+                    colorScheme: colorScheme
+                )
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPM)", trend: "speech speed", icon: "gauge.with.dots.needle.67percent", color: AppTheme.cyan),
+                    colorScheme: colorScheme
+                )
+                ConceptMetricCard(
+                    descriptor: DashboardMetricDescriptor(title: "Learned Terms", value: "\(memory.learnedTerms.count)", trend: "vocabulary bias", icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
+                    colorScheme: colorScheme
+                )
             }
 
             SettingsCard(colorScheme: colorScheme) {
@@ -2651,6 +2653,7 @@ private struct ActivityDayCell: View {
     let maxWords: Int
     let isInSelectedMonth: Bool
     let colorScheme: ColorScheme
+    @State private var isHovering = false
 
     private var fillRatio: CGFloat {
         guard maxWords > 0 else { return 0 }
@@ -2661,7 +2664,7 @@ private struct ActivityDayCell: View {
         VStack(spacing: 5) {
             HStack {
                 Text("\(Calendar.current.component(.day, from: bucket.date))")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 10, weight: isHovering ? .bold : .semibold))
                     .monospacedDigit()
                 Spacer(minLength: 0)
                 if bucket.dictations > 0 {
@@ -2683,21 +2686,32 @@ private struct ActivityDayCell: View {
             .frame(height: 42)
 
             Text("\(bucket.words)")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(bucket.words > 0 ? AppTheme.logoYellowSoft : .secondary)
                 .monospacedDigit()
+
+            Text(isHovering ? "\(bucket.dictations) captures • \(bucket.averageWPM) wpm" : " ")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .padding(7)
-        .frame(maxWidth: .infinity, minHeight: 82)
+        .frame(maxWidth: .infinity, minHeight: 98)
         .opacity(isInSelectedMonth ? 1 : 0.42)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.045) : Color.white.opacity(0.72))
+                .fill(colorScheme == .dark ? Color.white.opacity(isHovering ? 0.075 : 0.045) : Color.white.opacity(isHovering ? 0.84 : 0.72))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(bucket.words > 0 ? dotColor.opacity(0.34) : Color.clear, lineWidth: 0.7)
+                .stroke(bucket.words > 0 ? dotColor.opacity(isHovering ? 0.56 : 0.34) : Color.clear, lineWidth: isHovering ? 1 : 0.7)
         )
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.14)) {
+                isHovering = hovering
+            }
+        }
         .help("\(bucket.words) words, \(bucket.dictations) dictations, \(bucket.averageWPM) wpm")
     }
 
