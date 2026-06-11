@@ -404,6 +404,7 @@ private struct SidebarSystemStatusCard: View {
 private struct SettingsCard<Content: View>: View {
     let colorScheme: ColorScheme
     @ViewBuilder let content: Content
+    @State private var isHovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -413,16 +414,35 @@ private struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.065) : Color.white.opacity(0.72))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.05), radius: 12, y: 8)
+                .fill(colorScheme == .dark ? Color.white.opacity(isHovering ? 0.078 : 0.055) : Color.white.opacity(isHovering ? 0.82 : 0.72))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.28 : 0.06), radius: isHovering ? 16 : 14, y: 8)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(
-                    colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72),
-                    lineWidth: 0.7
+                    isHovering
+                        ? AppTheme.logoYellow.opacity(colorScheme == .dark ? 0.24 : 0.34)
+                        : (colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.72)),
+                    lineWidth: isHovering ? 0.9 : 0.7
                 )
         )
+        .overlay(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(
+                    LinearGradient(
+                        colors: [AppTheme.logoYellow.opacity(isHovering ? 0.10 : 0.045), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .allowsHitTesting(false)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.16)) {
+                isHovering = hovering
+            }
+        }
     }
 }
 
@@ -438,7 +458,7 @@ private struct CardHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
             if let subtitle {
                 Text(subtitle)
                     .font(.system(size: 11))

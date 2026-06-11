@@ -15,7 +15,7 @@ final class FloatingNodeController {
     var openSettingsAction: (() -> Void)?
 
     private let panelSize = NSSize(width: 190, height: 52)
-    private let bottomOffset: CGFloat = 8
+    private let bottomOffset: CGFloat = 14
 
     private init() {}
 
@@ -56,10 +56,27 @@ final class FloatingNodeController {
         panel?.contentView = host
         positionPanel(collapsed: true)
         panel?.orderFrontRegardless()
+
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(displayConfigurationDidChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
     }
 
     func hide() {
         panel?.orderOut(nil)
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
     }
 
     func positionPanel(collapsed: Bool) {
@@ -67,10 +84,25 @@ final class FloatingNodeController {
         let size = panelSize
         panel.setContentSize(size)
 
-        let screenFrame = NSScreen.main?.visibleFrame ?? .zero
+        let screenFrame = preferredScreen()?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         let x = screenFrame.midX - (size.width / 2)
         let y = screenFrame.minY + bottomOffset
         panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    private func preferredScreen() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        if let mouseScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+            return mouseScreen
+        }
+        if let panelScreen = panel?.screen {
+            return panelScreen
+        }
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    @objc private func displayConfigurationDidChange() {
+        positionPanel(collapsed: true)
     }
 
     func openSettingsWindow() {
@@ -92,16 +124,13 @@ struct FloatingNodeView: View {
 
     var body: some View {
         ZStack(alignment: .center) {
-            expandedNode
-                .opacity(isHovering ? 1 : 0)
-                .scaleEffect(isHovering ? 1 : 0.92, anchor: .bottom)
-                .offset(y: isHovering ? 0 : 7)
-                .allowsHitTesting(isHovering)
-
-            collapsedNode
-                .opacity(isHovering ? 0 : 1)
-                .scaleEffect(isHovering ? 0.84 : 1, anchor: .bottom)
-                .offset(y: isHovering ? 7 : 0)
+            if isHovering {
+                expandedNode
+                    .transition(.identity)
+            } else {
+                collapsedNode
+                    .transition(.identity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .contentShape(Capsule())
@@ -185,19 +214,9 @@ struct FloatingNodeView: View {
         .padding(.vertical, 7)
         .background(
             Capsule()
-                .fill(.ultraThinMaterial)
-                .background(
-                    Capsule()
-                        .fill(colorScheme == .dark ? Color.black.opacity(0.76) : Color.white.opacity(0.78))
-                        .blur(radius: 0.8)
-                )
+                .fill(colorScheme == .dark ? Color.black.opacity(0.88) : Color.white.opacity(0.94))
         )
-        .overlay(
-            Capsule()
-                .stroke(statusColor.opacity(engine.state == .idle ? 0.75 : 0.90), lineWidth: 1.35)
-        )
-        .shadow(color: statusColor.opacity(0.26), radius: 13)
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.30 : 0.12), radius: 10, y: 4)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.26 : 0.10), radius: 10, y: 4)
         .padding(.bottom, 5)
     }
 
@@ -302,7 +321,7 @@ struct FloatingNodeView: View {
     }
 
     private func animateHover(_ hovering: Bool) {
-        withAnimation(.interactiveSpring(response: 0.26, dampingFraction: 0.9, blendDuration: 0.08)) {
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.92, blendDuration: 0.04)) {
             isHovering = hovering
         }
     }
