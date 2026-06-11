@@ -3,8 +3,8 @@ import SwiftUI
 import Carbon.HIToolbox
 
 private enum AppTheme {
-    static let logoYellow = Color(red: 0.92, green: 0.61, blue: 0.06)
-    static let logoYellowSoft = Color(red: 0.98, green: 0.77, blue: 0.16)
+    static let logoYellow = Color(red: 0.973, green: 0.752, blue: 0.236)
+    static let logoYellowSoft = Color(red: 1.0, green: 0.82, blue: 0.25)
     static let ink = Color(red: 0.09, green: 0.09, blue: 0.08)
     static let graphite = Color(red: 0.18, green: 0.18, blue: 0.17)
     static let readyGreen = logoYellow
@@ -20,7 +20,7 @@ private enum AppTheme {
 
     static var selectedGradient: LinearGradient {
         LinearGradient(
-            colors: [logoYellow, Color(red: 0.78, green: 0.40, blue: 0.03)],
+            colors: [logoYellow, Color(red: 0.93, green: 0.66, blue: 0.13)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -888,10 +888,10 @@ private struct ConceptMetricCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                     Label(descriptor.trend, systemImage: "arrow.up")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: descriptor.trend.contains("%") ? 12 : 10, weight: .semibold))
                         .foregroundStyle(AppTheme.readyGreen)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.66)
+                        .minimumScaleFactor(0.78)
                 }
                 Spacer(minLength: 0)
             }
@@ -2706,18 +2706,18 @@ private struct ActivityDayCell: View {
             .frame(height: 42)
 
             Text("\(bucket.words)")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: isHovering ? 12 : 10, weight: .bold, design: .rounded))
                 .foregroundStyle(bucket.words > 0 ? AppTheme.logoYellowSoft : .secondary)
                 .monospacedDigit()
 
             Text(isHovering ? "\(bucket.dictations) captures • \(bucket.averageWPM) wpm" : " ")
-                .font(.system(size: 8, weight: .medium))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.76)
         }
-        .padding(7)
-        .frame(maxWidth: .infinity, minHeight: 98)
+        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: 112)
         .opacity(isInSelectedMonth ? 1 : 0.42)
         .background(
             RoundedRectangle(cornerRadius: 8)

@@ -69,8 +69,8 @@ func renderIcon(size: Int) -> NSImage {
     ctx.clip()
 
     let yellowColors = [
-        CGColor(red: 0.98, green: 0.77, blue: 0.16, alpha: 1.0),
-        CGColor(red: 0.92, green: 0.61, blue: 0.06, alpha: 1.0),
+        CGColor(red: 1.00, green: 0.82, blue: 0.25, alpha: 1.0),
+        CGColor(red: 0.973, green: 0.752, blue: 0.236, alpha: 1.0),
     ]
     let yellowGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: yellowColors as CFArray, locations: [0.0, 1.0])!
     ctx.drawLinearGradient(
@@ -112,13 +112,13 @@ func renderIcon(size: Int) -> NSImage {
     }
 
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.88))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.68, y: tile.minY + tile.height * 0.64), radius: tile.width * 0.069))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.663, y: tile.minY + tile.height * 0.687), radius: tile.width * 0.062))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.72))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.80, y: tile.minY + tile.height * 0.75), radius: tile.width * 0.039))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.774, y: tile.minY + tile.height * 0.762), radius: tile.width * 0.032))
     ctx.fillPath()
     ctx.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 0.68))
-    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.79, y: tile.minY + tile.height * 0.51), radius: tile.width * 0.043))
+    ctx.addPath(sparklePath(center: CGPoint(x: tile.minX + tile.width * 0.758, y: tile.minY + tile.height * 0.603), radius: tile.width * 0.036))
     ctx.fillPath()
 
     img.unlockFocus()

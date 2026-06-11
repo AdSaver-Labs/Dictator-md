@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum DictatorBrand {
-    static let yellow = Color(red: 0.92, green: 0.61, blue: 0.06)
-    static let yellowSoft = Color(red: 0.98, green: 0.77, blue: 0.16)
+    static let yellow = Color(red: 0.973, green: 0.752, blue: 0.236)
+    static let yellowSoft = Color(red: 1.0, green: 0.82, blue: 0.25)
     static let ink = Color(red: 0.08, green: 0.08, blue: 0.07)
     static let graphite = Color(red: 0.09, green: 0.095, blue: 0.10)
     static let panel = Color(red: 0.13, green: 0.135, blue: 0.145)
@@ -11,7 +11,7 @@ enum DictatorBrand {
 
     static var iconGradient: LinearGradient {
         LinearGradient(
-            colors: [yellowSoft, yellow, Color(red: 0.78, green: 0.40, blue: 0.03)],
+            colors: [yellowSoft, yellow, Color(red: 0.93, green: 0.66, blue: 0.13)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -45,20 +45,20 @@ struct DictatorLogoMark: View {
                 .rotationEffect(.degrees(-5))
 
             if showsStars {
-                SparkleStar(size: size * 0.138)
+                SparkleStar(size: size * 0.124)
                     .fill(DictatorBrand.ink.opacity(0.88))
-                    .frame(width: size * 0.138, height: size * 0.138)
-                    .offset(x: size * 0.18, y: -size * 0.14)
+                    .frame(width: size * 0.124, height: size * 0.124)
+                    .offset(x: size * 0.163, y: -size * 0.187)
 
-                SparkleStar(size: size * 0.078)
+                SparkleStar(size: size * 0.064)
                     .fill(DictatorBrand.ink.opacity(0.72))
-                    .frame(width: size * 0.078, height: size * 0.078)
-                    .offset(x: size * 0.30, y: -size * 0.25)
+                    .frame(width: size * 0.064, height: size * 0.064)
+                    .offset(x: size * 0.274, y: -size * 0.262)
 
-                SparkleStar(size: size * 0.086)
+                SparkleStar(size: size * 0.072)
                     .fill(DictatorBrand.ink.opacity(0.68))
-                    .frame(width: size * 0.086, height: size * 0.086)
-                    .offset(x: size * 0.29, y: -size * 0.01)
+                    .frame(width: size * 0.072, height: size * 0.072)
+                    .offset(x: size * 0.258, y: -size * 0.103)
             }
         }
         .frame(width: size, height: size)
