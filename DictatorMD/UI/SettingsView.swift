@@ -936,6 +936,10 @@ private struct ConceptWeeklyActivityCard: View {
         max(days.map(\.words).max() ?? 0, 1)
     }
 
+    private var monthWeeks: [[DailyWordBucket]] {
+        monthWeekBuckets(containing: Date(), calendar: calendar, history: history)
+    }
+
     var body: some View {
         ConceptPanel(colorScheme: colorScheme) {
             ViewThatFits(in: .horizontal) {
@@ -953,6 +957,22 @@ private struct ConceptWeeklyActivityCard: View {
                 }
             }
 
+            activityBody
+        }
+        .frame(minHeight: selectedRange == .thisMonth ? 430 : 330)
+    }
+
+    @ViewBuilder
+    private var activityBody: some View {
+        if selectedRange == .thisMonth {
+            MonthActivityGrid(
+                weeks: monthWeeks,
+                selectedMonth: Date(),
+                colorScheme: colorScheme
+            )
+            .padding(.top, 4)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else {
             HStack(alignment: .bottom, spacing: 10) {
                 VStack(alignment: .trailing) {
                     Text(axisLabel(1.0))
@@ -967,7 +987,7 @@ private struct ConceptWeeklyActivityCard: View {
                 .foregroundStyle(.secondary)
                 .frame(height: 210)
 
-                HStack(alignment: .bottom, spacing: selectedRange == .thisMonth ? 5 : 12) {
+                HStack(alignment: .bottom, spacing: 12) {
                     ForEach(days) { day in
                         dayColumn(day)
                     }
@@ -980,8 +1000,8 @@ private struct ConceptWeeklyActivityCard: View {
                         .offset(y: -22)
                 }
             }
+            .transition(.opacity)
         }
-        .frame(minHeight: 330)
     }
 
     private var rangeButtons: some View {
