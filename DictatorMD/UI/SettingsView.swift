@@ -2754,10 +2754,10 @@ private struct ActivityDayCell: View {
     }
 
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("\(Calendar.current.component(.day, from: bucket.date))")
-                    .font(.system(size: 10, weight: isHovering ? .bold : .semibold))
+                    .font(.system(size: 11, weight: isHovering ? .bold : .semibold))
                     .monospacedDigit()
                 Spacer(minLength: 0)
                 if bucket.dictations > 0 {
@@ -2765,6 +2765,11 @@ private struct ActivityDayCell: View {
                         .fill(dotColor)
                         .frame(width: 5, height: 5)
                 }
+            }
+
+            HStack(spacing: 4) {
+                MonthActivityStatChip(value: "\(bucket.dictations)", label: "cap", color: dotColor, isVisible: bucket.dictations > 0 || isHovering)
+                MonthActivityStatChip(value: "\(bucket.averageWPM)", label: "wpm", color: AppTheme.cyan, isVisible: bucket.averageWPM > 0 || isHovering)
             }
 
             GeometryReader { proxy in
@@ -2776,21 +2781,15 @@ private struct ActivityDayCell: View {
                         .frame(height: max(bucket.words > 0 ? 5 : 0, proxy.size.height * fillRatio))
                 }
             }
-            .frame(height: 42)
+            .frame(height: 32)
 
             Text("\(bucket.words)")
-                .font(.system(size: isHovering ? 12 : 10, weight: .bold, design: .rounded))
+                .font(.system(size: isHovering ? 13 : 11, weight: .bold, design: .rounded))
                 .foregroundStyle(bucket.words > 0 ? AppTheme.logoYellowSoft : .secondary)
                 .monospacedDigit()
-
-            Text(isHovering ? "\(bucket.dictations) captures • \(bucket.averageWPM) wpm" : " ")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
         }
         .padding(8)
-        .frame(maxWidth: .infinity, minHeight: 112)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
         .opacity(isInSelectedMonth ? 1 : 0.42)
         .background(
             RoundedRectangle(cornerRadius: 8)
@@ -2819,6 +2818,33 @@ private struct ActivityDayCell: View {
             colors: [AppTheme.logoYellow, dotColor],
             startPoint: .top,
             endPoint: .bottom
+        )
+    }
+}
+
+private struct MonthActivityStatChip: View {
+    let value: String
+    let label: String
+    let color: Color
+    let isVisible: Bool
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(isVisible ? color : .secondary.opacity(0.45))
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity)
+        .background(
+            Capsule()
+                .fill(color.opacity(isVisible ? 0.13 : 0.04))
         )
     }
 }
