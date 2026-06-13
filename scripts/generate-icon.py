@@ -71,8 +71,9 @@ func renderIcon(size: Int) -> NSImage {
     let yellowColors = [
         CGColor(red: 1.00, green: 0.82, blue: 0.25, alpha: 1.0),
         CGColor(red: 0.973, green: 0.752, blue: 0.236, alpha: 1.0),
+        CGColor(red: 0.93, green: 0.66, blue: 0.13, alpha: 1.0),
     ]
-    let yellowGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: yellowColors as CFArray, locations: [0.0, 1.0])!
+    let yellowGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: yellowColors as CFArray, locations: [0.0, 0.55, 1.0])!
     ctx.drawLinearGradient(
         yellowGradient,
         start: CGPoint(x: tile.minX, y: tile.maxY),
@@ -102,7 +103,7 @@ func renderIcon(size: Int) -> NSImage {
         NSGraphicsContext.saveGraphicsState()
         let transform = NSAffineTransform()
         transform.translateX(by: symbolRect.midX, yBy: symbolRect.midY)
-        transform.rotate(byDegrees: -5)
+        transform.rotate(byDegrees: 5)
         transform.translateX(by: -symbolRect.midX, yBy: -symbolRect.midY)
         transform.concat()
         NSColor(cgColor: ink)?.set()
