@@ -29,6 +29,10 @@ final class TextInjector {
                 return true
             }
 
+            if insertDirectlyWithAccessibility(text: prepared, target: target) {
+                return true
+            }
+
             if pasteWithClipboardRetry(text: prepared, target: target) {
                 return true
             }
@@ -50,7 +54,7 @@ final class TextInjector {
     func insert(text: String, targetApp: NSRunningApplication? = nil) -> Bool {
         insert(
             text: text,
-            target: InsertionTarget(app: targetApp, focusedElement: nil, selectedTextRange: nil)
+            target: InsertionTarget(app: targetApp, focusedElement: nil, focusedWindow: nil, selectedTextRange: nil)
         )
     }
 
@@ -67,8 +71,21 @@ final class TextInjector {
         DebugLog.shared.log("[TextInjector] activateTarget name=\(targetApp.localizedName ?? "nil") pid=\(targetApp.processIdentifier)")
         Thread.sleep(forTimeInterval: 0.16)
 
+        if let focusedWindow = target?.focusedWindow {
+            AXUIElementPerformAction(focusedWindow, kAXRaiseAction as CFString)
+            let appElement = AXUIElementCreateApplication(targetApp.processIdentifier)
+            let windowResult = AXUIElementSetAttributeValue(
+                appElement,
+                kAXFocusedWindowAttribute as CFString,
+                focusedWindow
+            )
+            DebugLog.shared.log("[TextInjector] restoreWindow result=\(windowResult.rawValue)")
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+
         guard let focusedElement = target?.focusedElement else { return }
 
+        let elementFocusResult = setFocused(true, on: focusedElement)
         let appElement = AXUIElementCreateApplication(targetApp.processIdentifier)
         let focusResult = AXUIElementSetAttributeValue(
             appElement,
@@ -76,8 +93,35 @@ final class TextInjector {
             focusedElement
         )
         let selectedRangeResult = restoreSelectedTextRange(target?.selectedTextRange, on: focusedElement)
-        DebugLog.shared.log("[TextInjector] restoreFocus result=\(focusResult.rawValue) selectedRange=\(selectedRangeResult.map(String.init) ?? "nil")")
+        DebugLog.shared.log("[TextInjector] restoreFocus element=\(elementFocusResult.map(String.init) ?? "nil") app=\(focusResult.rawValue) selectedRange=\(selectedRangeResult.map(String.init) ?? "nil")")
         Thread.sleep(forTimeInterval: 0.10)
+    }
+
+    private func insertDirectlyWithAccessibility(text: String, target: InsertionTarget?) -> Bool {
+        guard let element = target?.focusedElement else {
+            DebugLog.shared.log("[TextInjector] directAX skipped noFocusedElement")
+            return false
+        }
+
+        if let focusedWindow = target?.focusedWindow {
+            AXUIElementPerformAction(focusedWindow, kAXRaiseAction as CFString)
+        }
+
+        _ = setFocused(true, on: element)
+        _ = restoreSelectedTextRange(target?.selectedTextRange, on: element)
+        let result = AXUIElementSetAttributeValue(
+            element,
+            kAXSelectedTextAttribute as CFString,
+            text as CFString
+        )
+
+        if result == .success {
+            DebugLog.shared.log("[TextInjector] directAX selectedText ok")
+            return true
+        }
+
+        DebugLog.shared.log("[TextInjector] directAX selectedText failed result=\(result.rawValue)")
+        return false
     }
 
     private func prepareForInsertion(_ text: String) -> String {
@@ -170,6 +214,15 @@ final class TextInjector {
             element,
             kAXSelectedTextRangeAttribute as CFString,
             value
+        )
+        return result.rawValue
+    }
+
+    private func setFocused(_ focused: Bool, on element: AXUIElement) -> Int32? {
+        let result = AXUIElementSetAttributeValue(
+            element,
+            kAXFocusedAttribute as CFString,
+            focused as CFBoolean
         )
         return result.rawValue
     }

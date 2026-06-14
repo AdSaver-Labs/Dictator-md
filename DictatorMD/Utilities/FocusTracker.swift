@@ -3,6 +3,7 @@ import AppKit
 struct InsertionTarget {
     let app: NSRunningApplication?
     let focusedElement: AXUIElement?
+    let focusedWindow: AXUIElement?
     let selectedTextRange: CFRange?
 
     var appName: String? { app?.localizedName }
@@ -45,6 +46,7 @@ final class FocusTracker {
         return InsertionTarget(
             app: app,
             focusedElement: focusedElement,
+            focusedWindow: focusedElement.flatMap(Self.window(from:)),
             selectedTextRange: focusedElement.flatMap(Self.selectedTextRange(from:))
         )
     }
@@ -64,6 +66,17 @@ final class FocusTracker {
         let result = AXUIElementCopyAttributeValue(
             systemWide,
             kAXFocusedUIElementAttribute as CFString,
+            &value
+        )
+        guard result == .success, let value else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    private static func window(from element: AXUIElement) -> AXUIElement? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(
+            element,
+            kAXWindowAttribute as CFString,
             &value
         )
         guard result == .success, let value else { return nil }
