@@ -18,10 +18,10 @@ final class TextInjector {
         DebugLog.shared.log("[TextInjector] insert length=\(prepared.count) target=\(target?.appName ?? "nil") bundle=\(target?.bundleIdentifier ?? "nil") hasElement=\(target?.focusedElement != nil)")
 
         return typingQueue.sync {
-            restoreTargetIfNeeded(target)
+            let restoredTarget = restoreTargetIfNeeded(target)
             if !AXIsProcessTrusted() {
                 DebugLog.shared.log("[TextInjector] AX not trusted; trying clipboard paste fallback")
-                if pasteWithClipboard(text: prepared) {
+                if restoredTarget, pasteWithClipboard(text: prepared) {
                     return true
                 }
                 DebugLog.shared.log("[TextInjector] AX clipboard paste failed; using direct unicode typing fallback")
@@ -38,8 +38,7 @@ final class TextInjector {
             }
 
             DebugLog.shared.log("[TextInjector] clipboardPaste failed after retries; falling back to unicode")
-            restoreTargetIfNeeded(target)
-            if target?.focusedElement != nil {
+            if restoreTargetIfNeeded(target), target?.focusedElement != nil {
                 typeUnicode(text: prepared)
                 return true
             }
@@ -58,18 +57,28 @@ final class TextInjector {
         )
     }
 
-    private func restoreTargetIfNeeded(_ target: InsertionTarget?) {
+    @discardableResult
+    private func restoreTargetIfNeeded(_ target: InsertionTarget?) -> Bool {
         let targetApp = target?.app
         guard let targetApp,
               targetApp.bundleIdentifier != Bundle.main.bundleIdentifier,
               !targetApp.isTerminated else {
             DebugLog.shared.log("[TextInjector] activationSkipped target=\(targetApp?.localizedName ?? "nil")")
-            return
+            return targetApp == nil
         }
 
-        targetApp.activate(options: [.activateIgnoringOtherApps])
+        targetApp.activate(options: [.activateAllWindows])
+        if let bundleURL = targetApp.bundleURL {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.openApplication(at: bundleURL, configuration: configuration) { _, error in
+                if let error {
+                    DebugLog.shared.log("[TextInjector] openApplication activation error=\(error.localizedDescription)")
+                }
+            }
+        }
         DebugLog.shared.log("[TextInjector] activateTarget name=\(targetApp.localizedName ?? "nil") pid=\(targetApp.processIdentifier)")
-        Thread.sleep(forTimeInterval: 0.16)
+        Thread.sleep(forTimeInterval: 0.20)
 
         if let focusedWindow = target?.focusedWindow {
             AXUIElementPerformAction(focusedWindow, kAXRaiseAction as CFString)
@@ -83,7 +92,11 @@ final class TextInjector {
             Thread.sleep(forTimeInterval: 0.05)
         }
 
-        guard let focusedElement = target?.focusedElement else { return }
+        guard let focusedElement = target?.focusedElement else {
+            let restored = waitUntilFrontmost(targetApp, timeout: 1.25)
+            DebugLog.shared.log("[TextInjector] restoreTarget frontmost=\(restored) current=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+            return restored
+        }
 
         let elementFocusResult = setFocused(true, on: focusedElement)
         let appElement = AXUIElementCreateApplication(targetApp.processIdentifier)
@@ -95,6 +108,9 @@ final class TextInjector {
         let selectedRangeResult = restoreSelectedTextRange(target?.selectedTextRange, on: focusedElement)
         DebugLog.shared.log("[TextInjector] restoreFocus element=\(elementFocusResult.map(String.init) ?? "nil") app=\(focusResult.rawValue) selectedRange=\(selectedRangeResult.map(String.init) ?? "nil")")
         Thread.sleep(forTimeInterval: 0.10)
+        let restored = waitUntilFrontmost(targetApp, timeout: 1.25)
+        DebugLog.shared.log("[TextInjector] restoreTarget frontmost=\(restored) current=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+        return restored
     }
 
     private func insertDirectlyWithAccessibility(text: String, target: InsertionTarget?) -> Bool {
@@ -136,9 +152,16 @@ final class TextInjector {
     private func pasteWithClipboardRetry(text: String, target: InsertionTarget?) -> Bool {
         let delays: [TimeInterval] = [0.05, 0.14, 0.28]
         for (index, delay) in delays.enumerated() {
+            let targetIsFrontmost: Bool
             if index > 0 {
                 DebugLog.shared.log("[TextInjector] retryPaste attempt=\(index + 1)")
-                restoreTargetIfNeeded(target)
+                targetIsFrontmost = restoreTargetIfNeeded(target)
+            } else {
+                targetIsFrontmost = isTargetFrontmost(target)
+            }
+            guard targetIsFrontmost else {
+                DebugLog.shared.log("[TextInjector] pasteSkipped targetNotFrontmost target=\(target?.appName ?? "nil") current=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+                continue
             }
             Thread.sleep(forTimeInterval: delay)
             if pasteWithClipboard(text: text, restoreClipboard: index == delays.count - 1) {
@@ -225,6 +248,26 @@ final class TextInjector {
             focused as CFBoolean
         )
         return result.rawValue
+    }
+
+    private func isTargetFrontmost(_ target: InsertionTarget?) -> Bool {
+        guard let targetApp = target?.app else { return true }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        return frontmost?.processIdentifier == targetApp.processIdentifier
+            || frontmost?.bundleIdentifier == targetApp.bundleIdentifier
+    }
+
+    private func waitUntilFrontmost(_ targetApp: NSRunningApplication, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            if frontmost?.processIdentifier == targetApp.processIdentifier
+                || frontmost?.bundleIdentifier == targetApp.bundleIdentifier {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        return false
     }
 
     private func typeUnicode(text: String) {
