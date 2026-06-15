@@ -67,6 +67,15 @@ final class TextInjector {
             return targetApp == nil
         }
 
+        if isAppFrontmost(targetApp) {
+            DebugLog.shared.log("[TextInjector] activationSkipped alreadyFrontmost target=\(targetApp.localizedName ?? "nil")")
+            if let focusedElement = target?.focusedElement {
+                _ = setFocused(true, on: focusedElement)
+                _ = restoreSelectedTextRange(target?.selectedTextRange, on: focusedElement)
+            }
+            return true
+        }
+
         targetApp.activate(options: [.activateAllWindows])
         if let bundleURL = targetApp.bundleURL {
             let configuration = NSWorkspace.OpenConfiguration()
@@ -262,6 +271,10 @@ final class TextInjector {
 
     private func isTargetFrontmost(_ target: InsertionTarget?) -> Bool {
         guard let targetApp = target?.app else { return true }
+        return isAppFrontmost(targetApp)
+    }
+
+    private func isAppFrontmost(_ targetApp: NSRunningApplication) -> Bool {
         let frontmost = NSWorkspace.shared.frontmostApplication
         return frontmost?.processIdentifier == targetApp.processIdentifier
             || frontmost?.bundleIdentifier == targetApp.bundleIdentifier
