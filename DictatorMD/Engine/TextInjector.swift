@@ -29,7 +29,7 @@ final class TextInjector {
                 return true
             }
 
-            if insertDirectlyWithAccessibility(text: prepared, target: target) {
+            if !requiresClipboardPaste(target), insertDirectlyWithAccessibility(text: prepared, target: target) {
                 return true
             }
 
@@ -170,6 +170,16 @@ final class TextInjector {
         }
         putOnClipboard(text: text)
         return false
+    }
+
+    private func requiresClipboardPaste(_ target: InsertionTarget?) -> Bool {
+        switch target?.bundleIdentifier {
+        case "com.viber.osx":
+            DebugLog.shared.log("[TextInjector] compatibility clipboardPreferred bundle=com.viber.osx")
+            return true
+        default:
+            return false
+        }
     }
 
     private func pasteWithClipboard(text: String) -> Bool {
