@@ -5,19 +5,30 @@ struct InsertionTarget {
     let focusedElement: AXUIElement?
     let focusedWindow: AXUIElement?
     let selectedTextRange: CFRange?
+    let clickAnchor: ClickAnchor?
 
     var appName: String? { app?.localizedName }
     var bundleIdentifier: String? { app?.bundleIdentifier }
+}
+
+struct ClickAnchor {
+    let app: NSRunningApplication
+    let screenPoint: CGPoint
+    let capturedAt: Date
 }
 
 final class FocusTracker {
     static let shared = FocusTracker()
 
     private(set) var lastTargetApp: NSRunningApplication?
+    private var lastClickAnchor: ClickAnchor?
+    private var globalMouseMonitor: Any?
     private let ownBundleID = Bundle.main.bundleIdentifier
+    private let clickAnchorMaxAge: TimeInterval = 10 * 60
 
     private init() {
         update(from: NSWorkspace.shared.frontmostApplication)
+        startMouseTrackingFallback()
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeAppChanged(_:)),
@@ -47,8 +58,26 @@ final class FocusTracker {
             app: app,
             focusedElement: focusedElement,
             focusedWindow: focusedElement.flatMap(Self.window(from:)),
-            selectedTextRange: focusedElement.flatMap(Self.selectedTextRange(from:))
+            selectedTextRange: focusedElement.flatMap(Self.selectedTextRange(from:)),
+            clickAnchor: validClickAnchor(for: app)
         )
+    }
+
+    func recordMouseDown(screenPoint: CGPoint) {
+        guard !Self.isInsideOwnWindow(screenPoint),
+              !Self.isInsideOwnWindow(NSEvent.mouseLocation) else {
+            return
+        }
+
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.bundleIdentifier != ownBundleID,
+              !app.isTerminated else {
+            return
+        }
+
+        lastClickAnchor = ClickAnchor(app: app, screenPoint: screenPoint, capturedAt: Date())
+        update(from: app)
+        DebugLog.shared.log("[FocusTracker] clickAnchor app=\(app.localizedName ?? "nil") bundle=\(app.bundleIdentifier ?? "nil") point=\(Int(screenPoint.x)),\(Int(screenPoint.y))")
     }
 
     private func update(from app: NSRunningApplication?) {
@@ -58,6 +87,30 @@ final class FocusTracker {
             return
         }
         lastTargetApp = app
+    }
+
+    private func validClickAnchor(for app: NSRunningApplication?) -> ClickAnchor? {
+        guard let app,
+              let anchor = lastClickAnchor,
+              !anchor.app.isTerminated,
+              Date().timeIntervalSince(anchor.capturedAt) <= clickAnchorMaxAge,
+              (anchor.app.processIdentifier == app.processIdentifier || anchor.app.bundleIdentifier == app.bundleIdentifier) else {
+            return nil
+        }
+        return anchor
+    }
+
+    private func startMouseTrackingFallback() {
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+            let point = CGEvent(source: nil)?.location ?? NSEvent.mouseLocation
+            self?.recordMouseDown(screenPoint: point)
+        }
+    }
+
+    private static func isInsideOwnWindow(_ point: CGPoint) -> Bool {
+        NSApp.windows.contains { window in
+            window.isVisible && window.frame.contains(point)
+        }
     }
 
     private static func focusedElement() -> AXUIElement? {

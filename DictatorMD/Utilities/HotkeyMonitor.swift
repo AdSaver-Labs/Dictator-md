@@ -53,7 +53,8 @@ final class HotkeyMonitor {
 
         let eventMask = (1 << CGEventType.keyDown.rawValue) |
                         (1 << CGEventType.keyUp.rawValue) |
-                        (1 << CGEventType.flagsChanged.rawValue)
+                        (1 << CGEventType.flagsChanged.rawValue) |
+                        (1 << CGEventType.leftMouseDown.rawValue)
 
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
@@ -220,6 +221,11 @@ final class HotkeyMonitor {
     }
 
     private func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .leftMouseDown {
+            FocusTracker.shared.recordMouseDown(screenPoint: event.location)
+            return Unmanaged.passUnretained(event)
+        }
+
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
 
         if isModifierKey {

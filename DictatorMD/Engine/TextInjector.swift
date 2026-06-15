@@ -53,7 +53,7 @@ final class TextInjector {
     func insert(text: String, targetApp: NSRunningApplication? = nil) -> Bool {
         insert(
             text: text,
-            target: InsertionTarget(app: targetApp, focusedElement: nil, focusedWindow: nil, selectedTextRange: nil)
+            target: InsertionTarget(app: targetApp, focusedElement: nil, focusedWindow: nil, selectedTextRange: nil, clickAnchor: nil)
         )
     }
 
@@ -122,6 +122,40 @@ final class TextInjector {
         return restored
     }
 
+    @discardableResult
+    private func restoreClickAnchorIfNeeded(_ target: InsertionTarget?) -> Bool {
+        guard shouldUseClickAnchor(target),
+              let target,
+              let anchor = target.clickAnchor else {
+            return true
+        }
+
+        guard let targetApp = target.app,
+              !targetApp.isTerminated else {
+            DebugLog.shared.log("[TextInjector] clickAnchor skipped noTargetApp")
+            return false
+        }
+
+        if !isAppFrontmost(targetApp) {
+            targetApp.activate(options: [.activateAllWindows])
+            DebugLog.shared.log("[TextInjector] clickAnchor activateTarget name=\(targetApp.localizedName ?? "nil")")
+            guard waitUntilFrontmost(targetApp, timeout: 1.25) else {
+                DebugLog.shared.log("[TextInjector] clickAnchor skipped notFrontmost current=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+                return false
+            }
+            Thread.sleep(forTimeInterval: 0.12)
+        }
+
+        guard postMouseClick(at: anchor.screenPoint) else {
+            DebugLog.shared.log("[TextInjector] clickAnchor clickFailed point=\(Int(anchor.screenPoint.x)),\(Int(anchor.screenPoint.y))")
+            return false
+        }
+
+        DebugLog.shared.log("[TextInjector] clickAnchor restored point=\(Int(anchor.screenPoint.x)),\(Int(anchor.screenPoint.y))")
+        Thread.sleep(forTimeInterval: 0.16)
+        return true
+    }
+
     private func insertDirectlyWithAccessibility(text: String, target: InsertionTarget?) -> Bool {
         guard let element = target?.focusedElement else {
             DebugLog.shared.log("[TextInjector] directAX skipped noFocusedElement")
@@ -173,6 +207,9 @@ final class TextInjector {
                 continue
             }
             Thread.sleep(forTimeInterval: delay)
+            guard restoreClickAnchorIfNeeded(target) else {
+                continue
+            }
             if pasteWithClipboard(text: text, restoreClipboard: index == delays.count - 1) {
                 return true
             }
@@ -185,6 +222,31 @@ final class TextInjector {
         switch target?.bundleIdentifier {
         case "com.viber.osx":
             DebugLog.shared.log("[TextInjector] compatibility clipboardPreferred bundle=com.viber.osx")
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func shouldUseClickAnchor(_ target: InsertionTarget?) -> Bool {
+        guard let target,
+              target.clickAnchor != nil else {
+            return false
+        }
+
+        if target.focusedElement == nil {
+            return true
+        }
+
+        switch target.bundleIdentifier {
+        case "com.viber.osx",
+             "com.google.Chrome",
+             "com.google.Chrome.canary",
+             "com.brave.Browser",
+             "com.microsoft.edgemac",
+             "com.apple.Safari",
+             "org.mozilla.firefox",
+             "company.thebrowser.Browser":
             return true
         default:
             return false
@@ -246,6 +308,28 @@ final class TextInjector {
         keyDown.post(tap: .cghidEventTap)
         Thread.sleep(forTimeInterval: 0.012)
         keyUp.post(tap: .cghidEventTap)
+        return true
+    }
+
+    private func postMouseClick(at point: CGPoint) -> Bool {
+        guard let mouseDown = CGEvent(
+            mouseEventSource: source,
+            mouseType: .leftMouseDown,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        ),
+        let mouseUp = CGEvent(
+            mouseEventSource: source,
+            mouseType: .leftMouseUp,
+            mouseCursorPosition: point,
+            mouseButton: .left
+        ) else {
+            return false
+        }
+
+        mouseDown.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.018)
+        mouseUp.post(tap: .cghidEventTap)
         return true
     }
 
