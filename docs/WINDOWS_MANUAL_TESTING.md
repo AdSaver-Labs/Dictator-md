@@ -56,7 +56,9 @@ git submodule update --init --recursive
 
 ## Build the Windows Prototype
 
-From the repository root:
+From the repository root, use one of these build paths.
+
+### Option A — Visual Studio generator
 
 ```powershell
 cmake -S apps/windows -B build/windows -G "Visual Studio 17 2022" -A x64
@@ -67,6 +69,21 @@ Expected output:
 
 ```text
 build\windows\Release\Dictator-md.exe
+```
+
+### Option B — MSVC + Ninja
+
+If the Visual Studio generator is not found, open a **Developer PowerShell for VS 2022** window and run:
+
+```powershell
+cmake -S apps/windows -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/windows
+```
+
+Expected output:
+
+```text
+build\windows\Dictator-md.exe
 ```
 
 ## Run It

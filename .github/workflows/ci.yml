@@ -44,11 +44,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure Windows prototype
-        run: cmake -S apps/windows -B build/windows -G "Visual Studio 17 2022" -A x64
+        run: cmake -S apps/windows -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Windows prototype
-        run: cmake --build build/windows --config Release
+        run: cmake --build build/windows
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
