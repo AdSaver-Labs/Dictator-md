@@ -9,6 +9,7 @@
     <a href="https://dictatormd.app/">Website</a> &bull;
     <a href="#install-dmg">Download</a> &bull;
     <a href="#quick-start">Quick Start</a> &bull;
+    <a href="#windows-status">Windows Status</a> &bull;
     <a href="#features">Features</a> &bull;
     <a href="#privacy--safety">Privacy</a> &bull;
     <a href="#models">Models</a> &bull;
@@ -28,6 +29,19 @@
 **Free. Local. Private. No cloud. No API keys. No subscriptions. No data leaves your Mac.**
 
 Dictator-md is a **free, open-source macOS dictation app** -- a local alternative to [Willow Voice](https://www.heywillow.io/), [WisprFlow](https://wisprflow.com/), and Apple Dictation. It runs OpenAI's [Whisper](https://github.com/openai/whisper) speech recognition model entirely on your machine using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) with Metal GPU acceleration. Your voice never leaves your computer.
+
+## Windows Status
+
+**Windows support is currently a developer prototype, not a finished dictation app.**
+
+The working product today is the macOS app. The Windows scaffold exists so contributors/testers can validate native Windows pieces such as the tray app, global hotkey, active-window detection, and text insertion. It does **not yet** record microphone audio or run Whisper transcription on Windows. Pressing the prototype hotkey currently inserts a placeholder sentence.
+
+For Windows prototype build and manual testing steps, see:
+
+- [`apps/windows/README.md`](apps/windows/README.md)
+- [`docs/WINDOWS_MANUAL_TESTING.md`](docs/WINDOWS_MANUAL_TESTING.md)
+
+Do not send normal end users to the Windows build yet. It is for technical feedback and porting work only.
 
 **Why Dictator-md?**
 - Apple's built-in dictation sends audio to Apple servers and has limited accuracy for technical terms
