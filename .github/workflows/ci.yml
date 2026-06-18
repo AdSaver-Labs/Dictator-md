@@ -57,4 +57,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Dictator-md-windows-prototype
-          path: build/windows/Release/Dictator-md.exe
+          path: build/windows/Dictator-md.exe
