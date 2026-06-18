@@ -476,6 +476,7 @@ private struct DashboardSection: View {
     let engine: DictationEngine
     let colorScheme: ColorScheme
     @State private var availableWidth: CGFloat = 0
+    @State private var selectedActivityRange: ActivityRange = .thisWeek
 
     private var calendar: Calendar { .current }
 
@@ -502,10 +503,10 @@ private struct DashboardSection: View {
     @ViewBuilder
     private var metricCards: some View {
         let cards = [
-            DashboardMetricDescriptor(title: "Today's Words", value: formatted(wordsToday), trend: "+18% vs yesterday", icon: "doc.text", color: AppTheme.readyGreen),
-            DashboardMetricDescriptor(title: "Weekly Words", value: formatted(wordsThisWeek), trend: "+12% vs last week", icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0)),
-            DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPMThisWeek)", trend: "+6% vs last week", icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95)),
-            DashboardMetricDescriptor(title: "New Vocabulary", value: "\(newTermsThisWeek)", trend: "+8% vs last week", icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12))
+            DashboardMetricDescriptor(title: "\(selectedActivityRange.metricPrefix) Words", value: formatted(selectedItems.reduce(0) { $0 + $1.wordCount }), trend: selectedActivityRange.periodLabel, icon: "doc.text", color: AppTheme.readyGreen),
+            DashboardMetricDescriptor(title: "\(selectedActivityRange.metricPrefix) Dictations", value: formatted(selectedItems.count), trend: selectedActivityRange.periodLabel, icon: "calendar", color: Color(red: 0.30, green: 0.48, blue: 1.0)),
+            DashboardMetricDescriptor(title: "Average WPM", value: "\(selectedAverageWPM)", trend: selectedActivityRange.periodLabel, icon: "gauge.with.dots.needle.67percent", color: Color(red: 0.64, green: 0.36, blue: 0.95)),
+            DashboardMetricDescriptor(title: "New Vocabulary", value: "\(selectedLearnedTerms)", trend: selectedActivityRange.periodLabel, icon: "book", color: Color(red: 1.0, green: 0.66, blue: 0.12))
         ]
 
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: metricColumnCount), spacing: 12) {
@@ -519,7 +520,7 @@ private struct DashboardSection: View {
     private var dashboardPanels: some View {
         if availableWidth >= 900 {
             HStack(alignment: .top, spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
                     .frame(maxWidth: .infinity)
 
                 ConceptSystemCard(
@@ -535,7 +536,7 @@ private struct DashboardSection: View {
             }
         } else if availableWidth >= 620 {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
                 HStack(alignment: .top, spacing: 12) {
                     ConceptSystemCard(
                         selectedModel: settings.selectedModel,
@@ -549,7 +550,7 @@ private struct DashboardSection: View {
             }
         } else {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme)
+                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
                 ConceptSystemCard(
                     selectedModel: settings.selectedModel,
                     language: settings.dictationLanguage,
@@ -587,24 +588,26 @@ private struct DashboardSection: View {
         }
     }
 
-    private var wordsToday: Int {
-        words(since: calendar.startOfDay(for: Date()))
+    private var selectedInterval: DateInterval {
+        selectedActivityRange.dateInterval(calendar: calendar)
     }
 
-    private var wordsThisWeek: Int {
-        words(since: calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date()))
+    private var selectedItems: [DictationHistoryItem] {
+        memory.history.filter { selectedInterval.contains($0.timestamp) }
     }
 
-    private var newTermsToday: Int {
-        learnedTerms(since: calendar.startOfDay(for: Date()))
+    private var selectedLearnedTerms: Int {
+        memory.learnedTerms.filter {
+            selectedInterval.contains($0.firstSeen ?? $0.lastSeen)
+        }.count
     }
 
-    private var newTermsThisWeek: Int {
-        learnedTerms(since: calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date()))
-    }
-
-    private var averageWPMThisWeek: Int {
-        averageWPM(since: calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date()))
+    private var selectedAverageWPM: Int {
+        let eligibleItems = selectedItems.filter { $0.audioDuration > 0.5 }
+        let words = eligibleItems.reduce(0) { $0 + $1.wordCount }
+        let seconds = eligibleItems.reduce(0.0) { $0 + $1.audioDuration }
+        guard words > 0, seconds > 0 else { return 0 }
+        return Int((Double(words) / seconds * 60).rounded())
     }
 
     private var recentLearnedTerms: [LearnedTerm] {
@@ -627,24 +630,6 @@ private struct DashboardSection: View {
         case .english: return "EN"
         case .bulgarian: return "BG"
         }
-    }
-
-    private func words(since start: Date) -> Int {
-        memory.history
-            .filter { $0.timestamp >= start }
-            .reduce(0) { $0 + $1.wordCount }
-    }
-
-    private func learnedTerms(since start: Date) -> Int {
-        memory.learnedTerms.filter { ($0.firstSeen ?? $0.lastSeen) >= start }.count
-    }
-
-    private func averageWPM(since start: Date) -> Int {
-        let items = memory.history.filter { $0.timestamp >= start && $0.audioDuration > 0.5 }
-        let totalWords = items.reduce(0) { $0 + $1.wordCount }
-        let totalSeconds = items.reduce(0.0) { $0 + $1.audioDuration }
-        guard totalWords > 0, totalSeconds > 0 else { return 0 }
-        return Int((Double(totalWords) / totalSeconds * 60).rounded())
     }
 
     private func formatted(_ value: Int) -> String {
@@ -952,13 +937,48 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
     case thisMonth = "This month"
 
     var id: String { rawValue }
+
+    var metricPrefix: String {
+        switch self {
+        case .thisWeek: "This Week"
+        case .lastSevenDays: "Last 7 Days"
+        case .thisMonth: "This Month"
+        }
+    }
+
+    var periodLabel: String {
+        switch self {
+        case .thisWeek: "current calendar week"
+        case .lastSevenDays: "rolling 7-day period"
+        case .thisMonth: "current calendar month"
+        }
+    }
+
+    func dateInterval(calendar: Calendar, now: Date = Date()) -> DateInterval {
+        let today = calendar.startOfDay(for: now)
+        switch self {
+        case .thisWeek:
+            let weekday = calendar.component(.weekday, from: today)
+            let daysFromMonday = (weekday + 5) % 7
+            let start = calendar.date(byAdding: .day, value: -daysFromMonday, to: today) ?? today
+            let end = calendar.date(byAdding: .day, value: 7, to: start) ?? now
+            return DateInterval(start: start, end: end)
+        case .lastSevenDays:
+            let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+            let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+            return DateInterval(start: start, end: end)
+        case .thisMonth:
+            return calendar.dateInterval(of: .month, for: now)
+                ?? DateInterval(start: today, end: now)
+        }
+    }
 }
 
 private struct ConceptWeeklyActivityCard: View {
     let history: [DictationHistoryItem]
     let colorScheme: ColorScheme
+    @Binding var selectedRange: ActivityRange
     @State private var focusedDay: Date?
-    @State private var selectedRange: ActivityRange = .thisWeek
 
     private var calendar: Calendar { .current }
     private var days: [DailyWordBucket] {
@@ -1687,11 +1707,16 @@ private func monthWeekBuckets(
 }
 
 private struct WeeklyWordBars: View {
-    let days: [DailyWordBucket]
+    let history: [DictationHistoryItem]
     let colorScheme: ColorScheme
+    @Binding var selectedRange: ActivityRange
 
     var body: some View {
-        ConceptWeeklyActivityCard(history: DictationMemory.shared.history, colorScheme: colorScheme)
+        ConceptWeeklyActivityCard(
+            history: history,
+            colorScheme: colorScheme,
+            selectedRange: $selectedRange
+        )
             .frame(minHeight: 330)
     }
 }
@@ -2303,6 +2328,7 @@ private struct HistorySection: View {
     let colorScheme: ColorScheme
     @State private var isActivityExpanded = false
     @State private var selectedActivityMonth = Date()
+    @State private var selectedActivityRange: ActivityRange = .thisWeek
     @State private var availableWidth: CGFloat = 0
 
     private var calendar: Calendar { .current }
@@ -2365,8 +2391,8 @@ private struct HistorySection: View {
                 } else {
                     VStack(alignment: .leading, spacing: 14) {
                         ActivitySummaryStrip(
-                            title: isActivityExpanded ? monthTitle : "This week",
-                            buckets: isActivityExpanded ? monthBuckets : currentWeekBuckets,
+                            title: isActivityExpanded ? monthTitle : selectedActivityRange.metricPrefix,
+                            buckets: isActivityExpanded ? monthBuckets : selectedActivityBuckets,
                             colorScheme: colorScheme
                         )
 
@@ -2385,7 +2411,11 @@ private struct HistorySection: View {
                             )
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         } else {
-                            WeeklyWordBars(days: currentWeekBuckets, colorScheme: colorScheme)
+                            WeeklyWordBars(
+                                history: memory.history,
+                                colorScheme: colorScheme,
+                                selectedRange: $selectedActivityRange
+                            )
                                 .transition(.opacity)
                         }
                     }
@@ -2429,12 +2459,12 @@ private struct HistorySection: View {
 
     private var historyMetricCards: [DashboardMetricDescriptor] {
         [
-            DashboardMetricDescriptor(title: "Dictations", value: "\(memory.history.count)", trend: "stored locally", icon: "mic.badge.plus", color: AppTheme.logoYellow),
-            DashboardMetricDescriptor(title: "Total Words", value: formatted(totalWords), trend: "all-time memory", icon: "text.word.spacing", color: AppTheme.readyGreen),
-            DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPM)", trend: "speech speed", icon: "gauge.with.dots.needle.67percent", color: AppTheme.cyan),
-            DashboardMetricDescriptor(title: "Learned Terms", value: "\(memory.learnedTerms.count)", trend: "vocabulary bias", icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
-            DashboardMetricDescriptor(title: "Cleanup Cuts", value: "\(cleanupCuts)", trend: "fillers removed", icon: "wand.and.stars", color: Color(red: 0.74, green: 0.48, blue: 1.0)),
-            DashboardMetricDescriptor(title: "Time Saved", value: timeSavedLabel, trend: "vs typing", icon: "clock.badge.checkmark", color: Color(red: 0.95, green: 0.45, blue: 0.28))
+            DashboardMetricDescriptor(title: "Dictations", value: "\(selectedHistory.count)", trend: selectedActivityRange.periodLabel, icon: "mic.badge.plus", color: AppTheme.logoYellow),
+            DashboardMetricDescriptor(title: "Total Words", value: formatted(totalWords), trend: selectedActivityRange.periodLabel, icon: "text.word.spacing", color: AppTheme.readyGreen),
+            DashboardMetricDescriptor(title: "Average WPM", value: "\(averageWPM)", trend: selectedActivityRange.periodLabel, icon: "gauge.with.dots.needle.67percent", color: AppTheme.cyan),
+            DashboardMetricDescriptor(title: "Learned Terms", value: "\(selectedLearnedTerms)", trend: selectedActivityRange.periodLabel, icon: "sparkles", color: Color(red: 1.0, green: 0.66, blue: 0.12)),
+            DashboardMetricDescriptor(title: "Cleanup Cuts", value: "\(cleanupCuts)", trend: selectedActivityRange.periodLabel, icon: "wand.and.stars", color: Color(red: 0.74, green: 0.48, blue: 1.0)),
+            DashboardMetricDescriptor(title: "Time Saved", value: timeSavedLabel, trend: selectedActivityRange.periodLabel, icon: "clock.badge.checkmark", color: Color(red: 0.95, green: 0.45, blue: 0.28))
         ]
     }
 
@@ -2457,19 +2487,33 @@ private struct HistorySection: View {
         availableWidth = width
     }
 
+    private var selectedInterval: DateInterval {
+        selectedActivityRange.dateInterval(calendar: calendar)
+    }
+
+    private var selectedHistory: [DictationHistoryItem] {
+        memory.history.filter { selectedInterval.contains($0.timestamp) }
+    }
+
+    private var selectedLearnedTerms: Int {
+        memory.learnedTerms.filter {
+            selectedInterval.contains($0.firstSeen ?? $0.lastSeen)
+        }.count
+    }
+
     private var totalWords: Int {
-        memory.history.reduce(0) { $0 + $1.wordCount }
+        selectedHistory.reduce(0) { $0 + $1.wordCount }
     }
 
     private var averageWPM: Int {
-        let items = memory.history.filter { $0.audioDuration > 0.5 }
+        let items = selectedHistory.filter { $0.audioDuration > 0.5 }
         let totalSeconds = items.reduce(0.0) { $0 + $1.audioDuration }
         guard totalWords > 0, totalSeconds > 0 else { return 0 }
         return Int((Double(totalWords) / totalSeconds * 60).rounded())
     }
 
     private var cleanupCuts: Int {
-        memory.history.reduce(0) { $0 + ($1.cleanupCutCount ?? 0) }
+        selectedHistory.reduce(0) { $0 + ($1.cleanupCutCount ?? 0) }
     }
 
     private var timeSavedLabel: String {
@@ -2492,6 +2536,17 @@ private struct HistorySection: View {
         return dailyBuckets(
             startingAt: weekStart,
             endingAt: weekEnd,
+            calendar: calendar,
+            history: memory.history
+        )
+    }
+
+    private var selectedActivityBuckets: [DailyWordBucket] {
+        let interval = selectedActivityRange.dateInterval(calendar: calendar)
+        let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? interval.end
+        return dailyBuckets(
+            startingAt: interval.start,
+            endingAt: end,
             calendar: calendar,
             history: memory.history
         )
