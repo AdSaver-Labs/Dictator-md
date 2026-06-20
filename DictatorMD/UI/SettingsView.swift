@@ -175,6 +175,7 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open \(section.displayName)")
             }
 
             Spacer()
@@ -1090,6 +1091,7 @@ private struct ConceptWeeklyActivityCard: View {
                         .foregroundStyle(selectedRange == range ? AppTheme.logoYellowSoft : .secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Activity range: \(range.rawValue)")
             }
         }
     }
@@ -2822,9 +2824,19 @@ private struct ActivityDayCell: View {
                 }
             }
 
-            HStack(spacing: 4) {
-                MonthActivityStatChip(value: "\(bucket.dictations)", label: "cap", color: dotColor, isVisible: bucket.dictations > 0 || isHovering)
-                MonthActivityStatChip(value: "\(bucket.averageWPM)", label: "wpm", color: AppTheme.cyan, isVisible: bucket.averageWPM > 0 || isHovering)
+            VStack(spacing: 3) {
+                MonthActivityStatRow(
+                    value: "\(bucket.dictations)",
+                    label: "CAP",
+                    color: dotColor,
+                    isVisible: bucket.dictations > 0 || isHovering
+                )
+                MonthActivityStatRow(
+                    value: "\(bucket.averageWPM)",
+                    label: "WPM",
+                    color: AppTheme.cyan,
+                    isVisible: bucket.averageWPM > 0 || isHovering
+                )
             }
 
             GeometryReader { proxy in
@@ -2844,7 +2856,7 @@ private struct ActivityDayCell: View {
                 .monospacedDigit()
         }
         .padding(8)
-        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
         .opacity(isInSelectedMonth ? 1 : 0.42)
         .background(
             RoundedRectangle(cornerRadius: 8)
@@ -2877,30 +2889,35 @@ private struct ActivityDayCell: View {
     }
 }
 
-private struct MonthActivityStatChip: View {
+private struct MonthActivityStatRow: View {
     let value: String
     let label: String
     let color: Color
     let isVisible: Bool
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Spacer(minLength: 2)
+
             Text(value)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .monospacedDigit()
-            Text(label)
-                .font(.system(size: 8, weight: .bold))
+                .fixedSize(horizontal: true, vertical: false)
         }
         .foregroundStyle(isVisible ? color : .secondary.opacity(0.45))
-        .lineLimit(1)
-        .minimumScaleFactor(0.82)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 3)
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, minHeight: 20)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 5)
                 .fill(color.opacity(isVisible ? 0.13 : 0.04))
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(value)")
     }
 }
 
