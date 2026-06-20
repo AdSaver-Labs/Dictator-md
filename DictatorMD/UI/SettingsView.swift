@@ -521,7 +521,12 @@ private struct DashboardSection: View {
     private var dashboardPanels: some View {
         if availableWidth >= 900 {
             HStack(alignment: .top, spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
+                ConceptWeeklyActivityCard(
+                    history: memory.history,
+                    colorScheme: colorScheme,
+                    availableRanges: ActivityRange.dashboardRanges,
+                    selectedRange: $selectedActivityRange
+                )
                     .frame(maxWidth: .infinity)
 
                 ConceptSystemCard(
@@ -537,7 +542,12 @@ private struct DashboardSection: View {
             }
         } else if availableWidth >= 620 {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
+                ConceptWeeklyActivityCard(
+                    history: memory.history,
+                    colorScheme: colorScheme,
+                    availableRanges: ActivityRange.dashboardRanges,
+                    selectedRange: $selectedActivityRange
+                )
                 HStack(alignment: .top, spacing: 12) {
                     ConceptSystemCard(
                         selectedModel: settings.selectedModel,
@@ -551,7 +561,12 @@ private struct DashboardSection: View {
             }
         } else {
             VStack(spacing: 12) {
-                ConceptWeeklyActivityCard(history: memory.history, colorScheme: colorScheme, selectedRange: $selectedActivityRange)
+                ConceptWeeklyActivityCard(
+                    history: memory.history,
+                    colorScheme: colorScheme,
+                    availableRanges: ActivityRange.dashboardRanges,
+                    selectedRange: $selectedActivityRange
+                )
                 ConceptSystemCard(
                     selectedModel: settings.selectedModel,
                     language: settings.dictationLanguage,
@@ -940,6 +955,7 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
     case thisWeek = "This week"
     case lastSevenDays = "Last 7 days"
     case thisMonth = "This month"
+    case allTime = "All time"
 
     var id: String { rawValue }
 
@@ -948,6 +964,7 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
         case .thisWeek: "This Week"
         case .lastSevenDays: "Last 7 Days"
         case .thisMonth: "This Month"
+        case .allTime: "All Time"
         }
     }
 
@@ -956,6 +973,7 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
         case .thisWeek: "current calendar week"
         case .lastSevenDays: "rolling 7-day period"
         case .thisMonth: "current calendar month"
+        case .allTime: "complete stored history"
         }
     }
 
@@ -975,13 +993,20 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
         case .thisMonth:
             return calendar.dateInterval(of: .month, for: now)
                 ?? DateInterval(start: today, end: now)
+        case .allTime:
+            let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+            return DateInterval(start: .distantPast, end: end)
         }
     }
+
+    static let dashboardRanges: [ActivityRange] = [.thisWeek, .lastSevenDays, .thisMonth]
+    static let historyRanges: [ActivityRange] = [.thisWeek, .lastSevenDays, .thisMonth, .allTime]
 }
 
 private struct ConceptWeeklyActivityCard: View {
     let history: [DictationHistoryItem]
     let colorScheme: ColorScheme
+    let availableRanges: [ActivityRange]
     @Binding var selectedRange: ActivityRange
     @State private var focusedDay: Date?
 
@@ -1000,6 +1025,8 @@ private struct ConceptWeeklyActivityCard: View {
             guard let interval = calendar.dateInterval(of: .month, for: Date()) else { return [] }
             let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? Date()
             return dailyBuckets(startingAt: interval.start, endingAt: end, calendar: calendar, history: history)
+        case .allTime:
+            return []
         }
     }
 
@@ -1015,14 +1042,14 @@ private struct ConceptWeeklyActivityCard: View {
         ConceptPanel(colorScheme: colorScheme) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
-                    Text(selectedRange == .thisMonth ? "Monthly Activity" : "Weekly Activity")
+                    Text(activityTitle)
                         .font(.system(size: 15, weight: .semibold))
                     Spacer()
                     rangeButtons
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(selectedRange == .thisMonth ? "Monthly Activity" : "Weekly Activity")
+                    Text(activityTitle)
                         .font(.system(size: 15, weight: .semibold))
                     rangeButtons
                 }
@@ -1035,7 +1062,14 @@ private struct ConceptWeeklyActivityCard: View {
 
     @ViewBuilder
     private var activityBody: some View {
-        if selectedRange == .thisMonth {
+        if selectedRange == .allTime {
+            AllTimeActivityChart(
+                months: allTimeMonths,
+                colorScheme: colorScheme
+            )
+            .padding(.top, 4)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else if selectedRange == .thisMonth {
             MonthActivityGrid(
                 weeks: monthWeeks,
                 selectedMonth: Date(),
@@ -1077,7 +1111,7 @@ private struct ConceptWeeklyActivityCard: View {
 
     private var rangeButtons: some View {
         HStack(spacing: 6) {
-            ForEach(ActivityRange.allCases) { range in
+            ForEach(availableRanges) { range in
                 Button {
                     withAnimation(.easeOut(duration: 0.16)) {
                         selectedRange = range
@@ -1098,6 +1132,18 @@ private struct ConceptWeeklyActivityCard: View {
                 .accessibilityLabel("Activity range: \(range.rawValue)")
             }
         }
+    }
+
+    private var activityTitle: String {
+        switch selectedRange {
+        case .thisMonth: "Monthly Activity"
+        case .allTime: "All-Time Activity"
+        case .thisWeek, .lastSevenDays: "Weekly Activity"
+        }
+    }
+
+    private var allTimeMonths: [MonthlyActivityBucket] {
+        monthlyActivityBuckets(calendar: calendar, history: history)
     }
 
     private func dayColumn(_ day: DailyWordBucket) -> some View {
@@ -1663,6 +1709,39 @@ private struct DailyWordBucket: Identifiable {
     }
 }
 
+private struct MonthlyActivityBucket: Identifiable {
+    var id: Date { month }
+    let month: Date
+    let words: Int
+    let dictations: Int
+    let audioDuration: Double
+
+    var averageWPM: Int {
+        guard words > 0, audioDuration > 0 else { return 0 }
+        return Int((Double(words) / audioDuration * 60).rounded())
+    }
+}
+
+private func monthlyActivityBuckets(
+    calendar: Calendar,
+    history: [DictationHistoryItem]
+) -> [MonthlyActivityBucket] {
+    let grouped = Dictionary(grouping: history) { item in
+        calendar.dateInterval(of: .month, for: item.timestamp)?.start
+            ?? calendar.startOfDay(for: item.timestamp)
+    }
+
+    return grouped.map { month, items in
+        MonthlyActivityBucket(
+            month: month,
+            words: items.reduce(0) { $0 + $1.wordCount },
+            dictations: items.count,
+            audioDuration: items.reduce(0.0) { $0 + $1.audioDuration }
+        )
+    }
+    .sorted { $0.month < $1.month }
+}
+
 private func dailyBuckets(
     startingAt start: Date,
     endingAt end: Date,
@@ -1722,10 +1801,120 @@ private struct WeeklyWordBars: View {
         ConceptWeeklyActivityCard(
             history: history,
             colorScheme: colorScheme,
+            availableRanges: ActivityRange.historyRanges,
             selectedRange: $selectedRange
         )
             .frame(minHeight: 330)
     }
+}
+
+private struct AllTimeActivityChart: View {
+    let months: [MonthlyActivityBucket]
+    let colorScheme: ColorScheme
+    @State private var focusedMonth: Date?
+
+    private var maxWords: Int {
+        max(months.map(\.words).max() ?? 0, 1)
+    }
+
+    var body: some View {
+        if months.isEmpty {
+            EmptyStateLine(icon: "chart.bar.xaxis", text: "All-time activity will appear after your first dictation.")
+        } else {
+            ScrollView(.horizontal, showsIndicators: months.count > 8) {
+                HStack(alignment: .bottom, spacing: 12) {
+                    ForEach(months) { month in
+                        monthColumn(month)
+                    }
+                }
+                .frame(minWidth: 520, minHeight: 230, alignment: .bottomLeading)
+                .padding(.horizontal, 4)
+            }
+            .accessibilityLabel("All-time monthly activity")
+        }
+    }
+
+    private func monthColumn(_ month: MonthlyActivityBucket) -> some View {
+        let isFocused = focusedMonth == month.month
+        let barHeight = max(16, CGFloat(month.words) / CGFloat(maxWords) * 132)
+
+        return VStack(spacing: 7) {
+            VStack(spacing: 2) {
+                Text(compactWords(month.words))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text("\(month.dictations) captures")
+                    .font(.system(size: 8, weight: .semibold))
+                Text("\(month.averageWPM) wpm")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(AppTheme.cyan)
+            }
+            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+            .frame(height: 42)
+
+            RoundedRectangle(cornerRadius: 7)
+                .fill(
+                    isFocused
+                        ? AppTheme.selectedGradient
+                        : LinearGradient(
+                            colors: [AppTheme.logoYellow.opacity(0.58), AppTheme.logoYellow.opacity(0.16)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                )
+                .frame(width: 38, height: barHeight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(AppTheme.logoYellow.opacity(isFocused ? 0.62 : 0.18), lineWidth: 1)
+                )
+                .shadow(color: AppTheme.logoYellow.opacity(isFocused ? 0.26 : 0.08), radius: isFocused ? 8 : 3)
+
+            VStack(spacing: 1) {
+                Text(Self.monthFormatter.string(from: month.month))
+                    .font(.system(size: 10, weight: isFocused ? .bold : .semibold))
+                Text(Self.yearFormatter.string(from: month.month))
+                    .font(.system(size: 8, weight: .medium))
+            }
+            .foregroundStyle(isFocused ? AppTheme.logoYellowSoft : .secondary)
+        }
+        .frame(width: 66)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.14)) {
+                focusedMonth = hovering ? month.month : (focusedMonth == month.month ? nil : focusedMonth)
+            }
+        }
+        .help("\(month.words) words, \(month.dictations) dictations, \(month.averageWPM) wpm")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "All-time month: \(Self.fullMonthFormatter.string(from: month.month)), \(month.words) words, \(month.dictations) dictations, \(month.averageWPM) words per minute"
+        )
+    }
+
+    private func compactWords(_ words: Int) -> String {
+        if words >= 1000 {
+            return String(format: "%.1fK", Double(words) / 1000.0)
+        }
+        return "\(words)"
+    }
+
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        return formatter
+    }()
+
+    private static let yearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yy"
+        return formatter
+    }()
+
+    private static let fullMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "LLLL yyyy"
+        return formatter
+    }()
 }
 
 private struct DashboardTermRow: View {
@@ -2583,6 +2772,17 @@ private struct HistorySection: View {
     }
 
     private var selectedActivityBuckets: [DailyWordBucket] {
+        if selectedActivityRange == .allTime {
+            return monthlyActivityBuckets(calendar: calendar, history: memory.history).map { month in
+                DailyWordBucket(
+                    date: month.month,
+                    words: month.words,
+                    dictations: month.dictations,
+                    audioDuration: month.audioDuration
+                )
+            }
+        }
+
         let interval = selectedActivityRange.dateInterval(calendar: calendar)
         let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? interval.end
         return dailyBuckets(
