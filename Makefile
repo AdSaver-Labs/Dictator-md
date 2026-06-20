@@ -43,7 +43,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke
 
 all: whisper app
 
@@ -132,6 +132,9 @@ install-local: app
 
 ui-smoke:
 	xcrun swift scripts/verify-monthly-activity-ui.swift
+
+node-smoke:
+	xcrun swift scripts/verify-floating-node-ui.swift
 
 run: app
 	open "$(APP_BUNDLE)"

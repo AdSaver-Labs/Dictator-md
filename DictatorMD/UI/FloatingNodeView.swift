@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 final class FloatingNodePanel: NSPanel {
@@ -14,7 +15,9 @@ final class FloatingNodeController {
     private weak var engine: DictationEngine?
     var openSettingsAction: (() -> Void)?
 
-    private let panelSize = NSSize(width: 420, height: 150)
+    private let collapsedPanelSize = NSSize(width: 104, height: 20)
+    private let expandedPanelSize = NSSize(width: 276, height: 58)
+    private let previewPanelSize = NSSize(width: 360, height: 132)
     private let bottomOffset: CGFloat = 14
 
     private init() {}
@@ -31,7 +34,7 @@ final class FloatingNodeController {
     func show(engine: DictationEngine) {
         if panel == nil {
             let panel = FloatingNodePanel(
-                contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height),
+                contentRect: NSRect(x: 0, y: 0, width: collapsedPanelSize.width, height: collapsedPanelSize.height),
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
@@ -50,11 +53,13 @@ final class FloatingNodeController {
             self.panel = panel
         }
 
-        let view = FloatingNodeView(engine: engine)
+        let view = FloatingNodeView(engine: engine) { [weak self] presentation in
+            self?.setPresentation(presentation)
+        }
         let host = NSHostingView(rootView: view)
         hostingView = host
         panel?.contentView = host
-        positionPanel(collapsed: true)
+        setPresentation(.collapsed, animated: false)
         panel?.orderFrontRegardless()
 
         NotificationCenter.default.removeObserver(
@@ -79,15 +84,32 @@ final class FloatingNodeController {
         )
     }
 
-    func positionPanel(collapsed: Bool) {
+    func setPresentation(_ presentation: FloatingNodePresentation, animated: Bool = true) {
         guard let panel else { return }
-        let size = panelSize
-        panel.setContentSize(size)
+        let size: NSSize
+        switch presentation {
+        case .collapsed:
+            size = collapsedPanelSize
+        case .expanded:
+            size = expandedPanelSize
+        case .preview:
+            size = previewPanelSize
+        }
 
         let screenFrame = preferredScreen()?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         let x = screenFrame.midX - (size.width / 2)
         let y = screenFrame.minY + bottomOffset
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let targetFrame = NSRect(x: x, y: y, width: size.width, height: size.height)
+
+        if animated, panel.isVisible {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            panel.setFrame(targetFrame, display: true)
+        }
     }
 
     private func preferredScreen() -> NSScreen? {
@@ -102,12 +124,18 @@ final class FloatingNodeController {
     }
 
     @objc private func displayConfigurationDidChange() {
-        positionPanel(collapsed: true)
+        setPresentation(.collapsed, animated: false)
     }
 
     func openSettingsWindow() {
         openSettingsAction?()
     }
+}
+
+enum FloatingNodePresentation {
+    case collapsed
+    case expanded
+    case preview
 }
 
 extension Notification.Name {
@@ -116,6 +144,7 @@ extension Notification.Name {
 
 struct FloatingNodeView: View {
     let engine: DictationEngine
+    let presentationChanged: (FloatingNodePresentation) -> Void
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
@@ -127,19 +156,18 @@ struct FloatingNodeView: View {
             if isHovering {
                 expandedNode
                     .transition(.asymmetric(
-                        insertion: .offset(y: 8).combined(with: .scale(scale: 0.94, anchor: .bottom)),
-                        removal: .offset(y: 6).combined(with: .scale(scale: 0.96, anchor: .bottom))
+                        insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)),
+                        removal: .identity
                     ))
             } else {
                 collapsedNode
-                    .transition(.asymmetric(
-                        insertion: .offset(y: -4).combined(with: .scale(scale: 0.96, anchor: .bottom)),
-                        removal: .offset(y: 6).combined(with: .scale(scale: 0.92, anchor: .bottom))
-                    ))
+                    .transition(.identity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .animation(.interactiveSpring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.04), value: isHovering)
+        .onHover { hovering in
+            handleHover(hovering)
+        }
         .onChange(of: settings.floatingNodeEnabled) { _, enabled in
             if enabled {
                 FloatingNodeController.shared.show(engine: engine)
@@ -150,6 +178,10 @@ struct FloatingNodeView: View {
         .onDisappear {
             collapseWorkItem?.cancel()
             collapseWorkItem = nil
+        }
+        .onChange(of: engine.state) { _, state in
+            guard isHovering else { return }
+            presentationChanged(state == .preview ? .preview : .expanded)
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true)) {
@@ -177,11 +209,7 @@ struct FloatingNodeView: View {
                 }
             }
             .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
-            .padding(.bottom, 10)
             .contentShape(Capsule())
-            .onHover { hovering in
-                handleHover(hovering)
-            }
             .accessibilityLabel("Dictation node")
             .onTapGesture {
                 DebugLog.shared.log("[FloatingNode] collapsed tapped")
@@ -243,18 +271,14 @@ struct FloatingNodeView: View {
                 settingsButton
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 6)
         .background(
             Capsule()
                 .fill(colorScheme == .dark ? Color.black.opacity(0.88) : Color.white.opacity(0.94))
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.26 : 0.10), radius: 10, y: 4)
-        .padding(.bottom, 5)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 8, y: 3)
         .contentShape(Capsule())
-        .onHover { hovering in
-            handleHover(hovering)
-        }
     }
 
     private var languageButton: some View {
@@ -352,8 +376,14 @@ struct FloatingNodeView: View {
     }
 
     private func animateHover(_ hovering: Bool) {
-        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.92, blendDuration: 0.04)) {
+        if hovering {
+            presentationChanged(engine.state == .preview ? .preview : .expanded)
+        }
+        withAnimation(.easeOut(duration: hovering ? 0.14 : 0.10)) {
             isHovering = hovering
+        }
+        if !hovering {
+            presentationChanged(.collapsed)
         }
     }
 
@@ -382,14 +412,16 @@ private struct LoadingDots: View {
             let time = timeline.date.timeIntervalSinceReferenceDate
             HStack(spacing: spacing) {
                 ForEach(0..<3, id: \.self) { index in
-                    let phase = (sin((time * 5.2) - Double(index) * 0.72) + 1) / 2
+                    let wave = sin((time * 5.2) - Double(index) * 0.72)
+                    let intensity = (wave + 1) / 2
                     Circle()
-                        .fill(color.opacity(0.36 + phase * 0.64))
+                        .fill(color.opacity(0.40 + intensity * 0.60))
                         .frame(width: dotSize, height: dotSize)
-                        .offset(y: CGFloat(-phase * 2.4))
-                        .scaleEffect(0.82 + phase * 0.24)
+                        .offset(y: CGFloat(wave * 2.1))
+                        .scaleEffect(0.86 + intensity * 0.18)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
     }
 }
