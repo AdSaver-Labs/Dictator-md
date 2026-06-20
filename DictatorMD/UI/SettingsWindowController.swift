@@ -267,6 +267,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "Dictator-md Listening"
         case .processing:
             "Dictator-md Transcribing"
+        case .preview:
+            "Dictator-md Review"
         case .typing:
             "Dictator-md Typing"
         }
@@ -277,6 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .idle: "waveform.badge.mic"
         case .recording: "mic.circle.fill"
         case .processing: "brain.head.profile.fill"
+        case .preview: "pencil.and.list.clipboard"
         case .typing: "text.cursor"
         }
     }

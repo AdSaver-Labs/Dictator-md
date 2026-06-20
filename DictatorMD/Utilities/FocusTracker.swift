@@ -63,6 +63,23 @@ final class FocusTracker {
         )
     }
 
+    @discardableResult
+    func restoreAndSendUndo(target: InsertionTarget) -> Bool {
+        guard let app = target.app, !app.isTerminated else { return false }
+        app.activate(options: [.activateAllWindows])
+        Thread.sleep(forTimeInterval: 0.12)
+        guard let source = CGEventSource(stateID: .hidSystemState),
+              let down = CGEvent(keyboardEventSource: source, virtualKey: 6, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: 6, keyDown: false) else {
+            return false
+        }
+        down.flags = .maskCommand
+        up.flags = .maskCommand
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+        return true
+    }
+
     func recordMouseDown(screenPoint: CGPoint) {
         guard !Self.isInsideOwnWindow(screenPoint),
               !Self.isInsideOwnWindow(NSEvent.mouseLocation) else {

@@ -175,6 +175,7 @@ struct MenuBarView: View {
         case .idle: "waveform"
         case .recording: "mic.fill"
         case .processing: "brain.head.profile.fill"
+        case .preview: "pencil.and.list.clipboard"
         case .typing: "text.cursor"
         }
     }
@@ -184,6 +185,7 @@ struct MenuBarView: View {
         case .idle: engine.isModelLoaded ? "Ready — hold \(hotkeyLabel) to dictate" : "Loading model..."
         case .recording: "Listening..."
         case .processing: "Transcribing..."
+        case .preview: "Review transcription"
         case .typing: "Typing..."
         }
     }
@@ -193,6 +195,7 @@ struct MenuBarView: View {
         case .idle: engine.isModelLoaded ? .green : .orange
         case .recording: .red
         case .processing: .orange
+        case .preview: .cyan
         case .typing: .blue
         }
     }
@@ -202,6 +205,7 @@ struct MenuBarView: View {
         case .idle: [.green.opacity(0.8), .green.opacity(0.5)]
         case .recording: [.red.opacity(0.9), .red.opacity(0.6)]
         case .processing: [.orange.opacity(0.8), .orange.opacity(0.5)]
+        case .preview: [.cyan.opacity(0.8), .blue.opacity(0.5)]
         case .typing: [.blue.opacity(0.8), .blue.opacity(0.5)]
         }
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)

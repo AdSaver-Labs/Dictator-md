@@ -6,6 +6,7 @@ enum DictationState: String {
     case idle
     case recording
     case processing
+    case preview
     case typing
 }
 
@@ -15,6 +16,10 @@ final class DictationEngine {
     private(set) var lastTranscription: String = ""
     private(set) var isModelLoaded: Bool = false
     private(set) var modelLoadError: String?
+    private(set) var userFacingError: String?
+    private(set) var partialTranscription: String = ""
+    var previewText: String = ""
+    private(set) var canUndoLastInsertion = false
 
     /// True while the user is holding the hotkey but the toggle-mode threshold hasn't yet fired.
     /// Drives the menu bar hold indicator.
@@ -30,6 +35,13 @@ final class DictationEngine {
     private var recordingStartTime: Date?
     private var insertionTargetApp: NSRunningApplication?
     private var insertionTarget: InsertionTarget?
+    private var pendingPreviewTarget: InsertionTarget?
+    private var pendingPreviewLanguage: AppSettings.DictationLanguage?
+    private var pendingPreviewAudioDuration: Double = 0
+    private var pendingPreviewCleanupCutCount: Int = 0
+    private var operationID = UUID()
+    private var escapeMonitor: Any?
+    private var localEscapeMonitor: Any?
 
     private var accessibilityPoller: Timer?
 
@@ -62,11 +74,17 @@ final class DictationEngine {
         hotkeyMonitor?.start()
         PermissionManager.shared.checkPermissions()
         loadModelAsync()
+        installEscapeMonitor()
         LaunchAtLoginHelper.reconcile()
 
         if !axTrusted {
             startAccessibilityPoller()
         }
+    }
+
+    deinit {
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        if let localEscapeMonitor { NSEvent.removeMonitor(localEscapeMonitor) }
     }
 
     private func startAccessibilityPoller() {
@@ -160,7 +178,7 @@ final class DictationEngine {
             }
             self.lastUIStartAt = nil
             stopRecordingAndTranscribe()
-        case .processing, .typing:
+        case .processing, .preview, .typing:
             break
         }
     }
@@ -295,7 +313,7 @@ final class DictationEngine {
                 self.startRecording()
             case .recording:
                 self.stopRecordingAndTranscribe(trimTrailingSeconds: duration)
-            case .processing, .typing:
+            case .processing, .preview, .typing:
                 // Silent no-op: app is busy, ignore the gesture.
                 break
             }
@@ -333,9 +351,15 @@ final class DictationEngine {
         }
         guard isModelLoaded else {
             DebugLog.shared.log("[DictationEngine] startRecording ignored modelLoaded=false error=\(modelLoadError ?? "nil")")
+            userFacingError = modelLoadError ?? "The speech model is still loading."
             return
         }
 
+        operationID = UUID()
+        userFacingError = nil
+        partialTranscription = ""
+        previewText = ""
+        canUndoLastInsertion = false
         insertionTarget = currentInsertionTarget()
         insertionTargetApp = insertionTarget?.app
         DebugLog.shared.log("[DictationEngine] startRecording target=\(insertionTargetApp?.localizedName ?? "nil") bundle=\(insertionTargetApp?.bundleIdentifier ?? "nil")")
@@ -349,6 +373,90 @@ final class DictationEngine {
             fputs("[DictationEngine] Failed to start recording: \(error)\n", stderr)
             DebugLog.shared.log("[DictationEngine] startRecording failed error=\(error.localizedDescription)")
             state = .idle
+            userFacingError = "Could not start the microphone. Check microphone permission and the selected input device."
+        }
+    }
+
+    func cancelCurrentOperation() {
+        guard state != .idle else { return }
+        operationID = UUID()
+        if state == .recording {
+            _ = audioCapture.stopRecording()
+            soundFeedback.playStopSound()
+        }
+        partialTranscription = ""
+        previewText = ""
+        pendingPreviewTarget = nil
+        pendingPreviewLanguage = nil
+        userFacingError = "Dictation cancelled."
+        state = .idle
+        DebugLog.shared.log("[DictationEngine] operation cancelled")
+    }
+
+    func acceptPreview() {
+        guard state == .preview else { return }
+        let text = previewText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            cancelCurrentOperation()
+            return
+        }
+        let target = pendingPreviewTarget
+        let language = pendingPreviewLanguage ?? AppSettings.shared.dictationLanguage
+        state = .typing
+        let inserted = textInjector.insert(text: text, target: target)
+        if inserted {
+            DictationMemory.shared.record(
+                text: text,
+                language: language,
+                targetApp: target?.app,
+                audioDuration: pendingPreviewAudioDuration,
+                cleanupCutCount: pendingPreviewCleanupCutCount
+            )
+            lastTranscription = text
+            canUndoLastInsertion = true
+            userFacingError = nil
+        } else {
+            userFacingError = "Text could not be inserted. It was copied to the clipboard."
+        }
+        clearPendingPreview()
+        soundFeedback.playDoneSound()
+        state = .idle
+    }
+
+    func discardPreview() {
+        clearPendingPreview()
+        previewText = ""
+        partialTranscription = ""
+        userFacingError = "Preview discarded."
+        state = .idle
+    }
+
+    func undoLastInsertion() {
+        guard canUndoLastInsertion, let target = insertionTarget else { return }
+        _ = FocusTracker.shared.restoreAndSendUndo(target: target)
+        canUndoLastInsertion = false
+    }
+
+    private func clearPendingPreview() {
+        pendingPreviewTarget = nil
+        pendingPreviewLanguage = nil
+        pendingPreviewAudioDuration = 0
+        pendingPreviewCleanupCutCount = 0
+    }
+
+    private func installEscapeMonitor() {
+        escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, AppSettings.shared.escapeToCancelEnabled else { return }
+            DispatchQueue.main.async { self?.cancelCurrentOperation() }
+        }
+        localEscapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53,
+                  AppSettings.shared.escapeToCancelEnabled,
+                  self?.state != .idle else {
+                return event
+            }
+            self?.cancelCurrentOperation()
+            return nil
         }
     }
 
@@ -381,6 +489,8 @@ final class DictationEngine {
 
         let audioDuration = Double(audioBuffer.count) / 16000.0
         state = .processing
+        partialTranscription = ""
+        let currentOperationID = operationID
 
         let bridge = self.whisperBridge
         let language = AppSettings.shared.dictationLanguage
@@ -425,14 +535,17 @@ final class DictationEngine {
                 return
             }
 
-            await MainActor.run { [weak self] in
-                self?.state = .typing
-            }
-
             var rawText = bridge.transcribe(
                 audioBuffer: audioBuffer,
                 language: language,
-                prompt: prompt
+                prompt: prompt,
+                onSegment: AppSettings.shared.streamingPreviewEnabled ? { [weak self] segment in
+                    Task { @MainActor in
+                        guard let self, self.operationID == currentOperationID else { return }
+                        let separator = self.partialTranscription.isEmpty ? "" : " "
+                        self.partialTranscription += separator + segment
+                    }
+                } : nil
             )
             DebugLog.shared.log("[DictationEngine] firstTranscription length=\(rawText.count)")
 
@@ -462,13 +575,32 @@ final class DictationEngine {
                 )
             }
 
-            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody)
+            let outputStyle = AppSettings.shared.effectiveOutputStyle(for: target?.bundleIdentifier)
+            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle)
             let fullText = Self.guardLanguageOutput(correctedText, language: language)
             let cleanupCutCount = DictationMemory.estimatedCleanupCutCount(raw: rawText, final: fullText)
             fputs("[DictationEngine] Final text: \(fullText)\n", stderr)
             DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count) text=\"\(fullText)\"")
 
+            guard await MainActor.run(body: { [weak self] in self?.operationID == currentOperationID }) else {
+                DebugLog.shared.log("[DictationEngine] discarded cancelled transcription")
+                return
+            }
+
             if !Self.isLikelySilenceHallucination(fullText, audioDuration: audioDuration), !fullText.isEmpty {
+                if AppSettings.shared.previewBeforeInsert {
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
+                        self.previewText = fullText
+                        self.partialTranscription = fullText
+                        self.pendingPreviewTarget = target
+                        self.pendingPreviewLanguage = language
+                        self.pendingPreviewAudioDuration = audioDuration
+                        self.pendingPreviewCleanupCutCount = cleanupCutCount
+                        self.state = .preview
+                    }
+                    return
+                }
                 DebugLog.shared.log("[DictationEngine] insertingText target=\(targetApp?.localizedName ?? "nil")")
                 await MainActor.run {
                     DictationMemory.shared.record(
@@ -481,13 +613,21 @@ final class DictationEngine {
                 }
                 let inserted = injector.insert(text: fullText, target: target)
                 DebugLog.shared.log("[DictationEngine] insertionResult success=\(inserted)")
+                await MainActor.run { [weak self] in
+                    self?.canUndoLastInsertion = inserted
+                    self?.userFacingError = inserted ? nil : "Text could not be inserted. It was copied to the clipboard."
+                }
             } else {
                 DebugLog.shared.log("[DictationEngine] insertionSkipped emptyOrSilence audioDuration=\(String(format: "%.2f", audioDuration))")
+                await MainActor.run { [weak self] in
+                    self?.userFacingError = "No clear speech was detected."
+                }
             }
 
             await MainActor.run { [weak self] in
                 if !fullText.isEmpty {
                     self?.lastTranscription = fullText
+                    self?.partialTranscription = ""
                 }
             }
 

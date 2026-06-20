@@ -584,6 +584,8 @@ private struct DashboardSection: View {
             return "Listening"
         case .processing:
             return "Transcribing"
+        case .preview:
+            return "Review Transcription"
         case .typing:
             return "Pasting Text"
         }
@@ -804,6 +806,7 @@ private struct DashboardTopController: View {
         case .idle: return engine.isModelLoaded ? AppTheme.logoYellow : .orange
         case .recording: return .red
         case .processing: return AppTheme.cyan
+        case .preview: return AppTheme.cyan
         case .typing: return AppTheme.cyan
         }
     }
@@ -813,6 +816,7 @@ private struct DashboardTopController: View {
         case .idle: return "mic.fill"
         case .recording: return "stop.fill"
         case .processing: return "brain.head.profile.fill"
+        case .preview: return "pencil.and.list.clipboard"
         case .typing: return "text.cursor"
         }
     }
@@ -1519,6 +1523,7 @@ private struct DashboardHeroCard: View {
         case .idle: return AppTheme.readyGreen
         case .recording: return .red
         case .processing: return AppTheme.cyan
+        case .preview: return AppTheme.cyan
         case .typing: return AppTheme.logoYellow
         }
     }
@@ -1809,6 +1814,14 @@ private struct GeneralSection: View {
                         : "Press to start, press to stop — easier on the wrists"
                 )
                 HotkeyRecorder(keyCode: $settings.hotkeyKeyCode, colorScheme: colorScheme)
+                if !Self.modifierKeyCodes.contains(settings.hotkeyKeyCode) {
+                    Label(
+                        "This is a regular key and may conflict with shortcuts in other applications. A dedicated modifier such as Right Option is safer.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                }
 
                 Picker("Mode", selection: $settings.hotkeyMode) {
                     Text("Push-to-talk").tag(AppSettings.HotkeyMode.pushToTalk)
@@ -1923,6 +1936,30 @@ private struct GeneralSection: View {
             SettingsCard(colorScheme: colorScheme) {
                 CardHeader("Preferences")
                 HStack {
+                    Label("Output style", systemImage: "text.badge.checkmark")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Picker("Output style", selection: $settings.outputStyle) {
+                        ForEach(AppSettings.OutputStyle.allCases) { style in
+                            Text(style.label).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 260)
+                    .labelsHidden()
+                }
+                Text("Raw preserves the transcript. Standard fixes casing and punctuation. Polished also removes common filler words. Everything remains local.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Toggle("Choose output style automatically for each application", isOn: $settings.applicationProfilesEnabled)
+                    .font(.system(size: 13))
+                Toggle("Review and edit before inserting", isOn: $settings.previewBeforeInsert)
+                    .font(.system(size: 13))
+                Toggle("Show decoded text while processing", isOn: $settings.streamingPreviewEnabled)
+                    .font(.system(size: 13))
+                Toggle("Press Escape to cancel dictation", isOn: $settings.escapeToCancelEnabled)
+                    .font(.system(size: 13))
+                HStack {
                     Label("Appearance", systemImage: "circle.lefthalf.filled")
                         .font(.system(size: 13))
                     Spacer()
@@ -1965,6 +2002,8 @@ private struct GeneralSection: View {
             "Forces English recognition and blocks Cyrillic output, so English dictation stays in Latin characters."
         }
     }
+
+    private static let modifierKeyCodes: Set<Int> = [54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
 }
 
 // MARK: - Hotkey Recorder
@@ -3229,7 +3268,7 @@ private struct ProtocolsSection: View {
                 ProtocolChecklist(items: [
                     "Signing identity and bundle identifier must stay stable: Dictator-md Stable Local + com.dictatormd.DictatorMD.",
                     "Local builds must fail rather than fall back to ad-hoc signing; ad-hoc signatures break macOS Accessibility grants.",
-                    "Install local builds only through make install-local so old DictatorMD/WhisperDictation app registrations are removed before launch.",
+                    "Install local builds only through make install-local so stale DictatorMD app registrations are removed before launch.",
                     "Permission UI must reflect real runtime checks only: microphone uses AVCapture authorization; Accessibility uses AXIsProcessTrusted().",
                     "Hotkey capture must keep a working fallback: event tap when Accessibility is trusted, NSEvent fallback when it is not.",
                     "Recording must not start unless the local model is loaded and microphone access is authorized.",

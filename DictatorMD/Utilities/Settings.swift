@@ -50,6 +50,40 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         }
     }
 
+    enum OutputStyle: String, CaseIterable, Identifiable {
+        case raw
+        case standard
+        case polished
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .raw: "Raw"
+            case .standard: "Standard"
+            case .polished: "Polished"
+            }
+        }
+    }
+
+    enum ApplicationProfile: String, CaseIterable, Identifiable {
+        case automatic
+        case code
+        case chat
+        case prose
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .automatic: "Automatic"
+            case .code: "Code & Terminal"
+            case .chat: "Chat"
+            case .prose: "Email & Documents"
+            }
+        }
+    }
+
     // MARK: - Keys
 
     private enum Key: String {
@@ -69,6 +103,11 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case floatingNodeEnabled
         case appearanceMode
         case intonationFormattingEnabled
+        case outputStyle
+        case applicationProfilesEnabled
+        case previewBeforeInsert
+        case escapeToCancelEnabled
+        case streamingPreviewEnabled
     }
 
     // MARK: - Properties
@@ -163,6 +202,49 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     var intonationFormattingEnabled: Bool {
         get { defaults.object(forKey: Key.intonationFormattingEnabled.rawValue) as? Bool ?? false }
         set { defaults.set(newValue, forKey: Key.intonationFormattingEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var outputStyle: OutputStyle {
+        get {
+            let raw = defaults.string(forKey: Key.outputStyle.rawValue) ?? OutputStyle.standard.rawValue
+            return OutputStyle(rawValue: raw) ?? .standard
+        }
+        set { defaults.set(newValue.rawValue, forKey: Key.outputStyle.rawValue); objectWillChange.send() }
+    }
+
+    var applicationProfilesEnabled: Bool {
+        get { defaults.object(forKey: Key.applicationProfilesEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.applicationProfilesEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var previewBeforeInsert: Bool {
+        get { defaults.object(forKey: Key.previewBeforeInsert.rawValue) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: Key.previewBeforeInsert.rawValue); objectWillChange.send() }
+    }
+
+    var escapeToCancelEnabled: Bool {
+        get { defaults.object(forKey: Key.escapeToCancelEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.escapeToCancelEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var streamingPreviewEnabled: Bool {
+        get { defaults.object(forKey: Key.streamingPreviewEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.streamingPreviewEnabled.rawValue); objectWillChange.send() }
+    }
+
+    func effectiveOutputStyle(for bundleIdentifier: String?) -> OutputStyle {
+        guard applicationProfilesEnabled, let bundleIdentifier else { return outputStyle }
+        let lower = bundleIdentifier.lowercased()
+        if ["terminal", "xcode", "visual-studio-code", "com.microsoft.vscode", "warp", "iterm"].contains(where: lower.contains) {
+            return .raw
+        }
+        if ["slack", "discord", "telegram", "viber", "messages"].contains(where: lower.contains) {
+            return .standard
+        }
+        if ["mail", "outlook", "pages", "word", "notion", "docs"].contains(where: lower.contains) {
+            return .polished
+        }
+        return outputStyle
     }
 
     func addCustomTerm(_ term: String) {

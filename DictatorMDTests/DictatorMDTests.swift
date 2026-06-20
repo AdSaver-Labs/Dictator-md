@@ -65,6 +65,29 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertTrue(AppSettings.shared.grammarCorrectionEnabled)
     }
 
+    func testOutputStyleRoundTrips() {
+        let settings = AppSettings.shared
+        let original = settings.outputStyle
+        settings.outputStyle = .raw
+        XCTAssertEqual(settings.outputStyle, .raw)
+        settings.outputStyle = .polished
+        XCTAssertEqual(settings.outputStyle, .polished)
+        settings.outputStyle = original
+    }
+
+    func testApplicationProfilesChooseExpectedStyles() {
+        let settings = AppSettings.shared
+        let originalEnabled = settings.applicationProfilesEnabled
+        let originalStyle = settings.outputStyle
+        settings.applicationProfilesEnabled = true
+        settings.outputStyle = .standard
+        XCTAssertEqual(settings.effectiveOutputStyle(for: "com.apple.Terminal"), .raw)
+        XCTAssertEqual(settings.effectiveOutputStyle(for: "com.tinyspeck.slackmacgap"), .standard)
+        XCTAssertEqual(settings.effectiveOutputStyle(for: "com.apple.mail"), .polished)
+        settings.applicationProfilesEnabled = originalEnabled
+        settings.outputStyle = originalStyle
+    }
+
     func testNumberConversionDefault() {
         XCTAssertTrue(AppSettings.shared.numberConversionEnabled)
     }
@@ -118,6 +141,7 @@ final class DictationStateTests: XCTestCase {
         XCTAssertEqual(DictationState.idle.rawValue, "idle")
         XCTAssertEqual(DictationState.recording.rawValue, "recording")
         XCTAssertEqual(DictationState.processing.rawValue, "processing")
+        XCTAssertEqual(DictationState.preview.rawValue, "preview")
         XCTAssertEqual(DictationState.typing.rawValue, "typing")
     }
 }
@@ -359,6 +383,17 @@ final class TextCorrectorTests: XCTestCase {
         XCTAssertTrue(result.contains("300"))
         XCTAssertTrue(result.contains("RAM"))
         XCTAssertTrue(result.contains("I need"))
+    }
+
+    func testRawStylePreservesFillersAndCasing() {
+        XCTAssertEqual(corrector.correct("um hello api", style: .raw), "um hello api")
+    }
+
+    func testPolishedStyleRemovesFillers() {
+        let result = corrector.correct("um I mean create an api", style: .polished)
+        XCTAssertFalse(result.lowercased().contains("um"))
+        XCTAssertFalse(result.lowercased().contains("i mean"))
+        XCTAssertTrue(result.contains("API"))
     }
 
     // MARK: Custom Terms

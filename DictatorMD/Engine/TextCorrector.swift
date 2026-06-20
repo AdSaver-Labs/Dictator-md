@@ -10,11 +10,20 @@ final class TextCorrector: @unchecked Sendable {
     private var cachedRegex: NSRegularExpression?
     private var cachedLookup: [String: String] = [:]  // lowercased → original casing
 
-    func correct(_ text: String, prosody: ProsodyFeatures? = nil) -> String {
+    func correct(
+        _ text: String,
+        prosody: ProsodyFeatures? = nil,
+        style: AppSettings.OutputStyle? = nil
+    ) -> String {
+        let effectiveStyle = style ?? AppSettings.shared.outputStyle
+        if effectiveStyle == .raw { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard AppSettings.shared.grammarCorrectionEnabled else { return text }
         let startTime = CFAbsoluteTimeGetCurrent()
 
         var result = text
+        if effectiveStyle == .polished {
+            result = removeFillers(result)
+        }
         if AppSettings.shared.numberConversionEnabled {
             result = convertWordsToNumbers(result)
         }
@@ -30,6 +39,19 @@ final class TextCorrector: @unchecked Sendable {
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
         print("[TextCorrector] \(String(format: "%.1f", elapsed))ms: \"\(text)\" → \"\(result)\"")
         return result
+    }
+
+    private func removeFillers(_ text: String) -> String {
+        var result = text
+        let patterns = [
+            "(?i)\\b(?:um+|uh+|erm+|you know|i mean)\\b[,]?\\s*",
+            "\\b(?:ъм+|ъ+|ами|значи)\\b[,]?\\s*"
+        ]
+        for pattern in patterns {
+            result = result.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return result.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Pass 0: Number Word → Digit Conversion

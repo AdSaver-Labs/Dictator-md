@@ -14,7 +14,7 @@ final class FloatingNodeController {
     private weak var engine: DictationEngine?
     var openSettingsAction: (() -> Void)?
 
-    private let panelSize = NSSize(width: 190, height: 52)
+    private let panelSize = NSSize(width: 420, height: 150)
     private let bottomOffset: CGFloat = 14
 
     private init() {}
@@ -192,13 +192,56 @@ struct FloatingNodeView: View {
     }
 
     private var expandedNode: some View {
-        HStack(spacing: 8) {
-            languageButton
-            micButton
-            if isWorking {
-                processingIndicator
+        VStack(spacing: 8) {
+            if engine.state == .preview {
+                TextEditor(text: Binding(
+                    get: { engine.previewText },
+                    set: { engine.previewText = $0 }
+                ))
+                .font(.system(size: 12))
+                .frame(height: 58)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.06)))
+            } else if !engine.partialTranscription.isEmpty {
+                Text(engine.partialTranscription)
+                    .font(.system(size: 11))
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let error = engine.userFacingError {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            settingsButton
+
+            HStack(spacing: 8) {
+                languageButton
+                if engine.state == .preview {
+                    Button("Discard") { engine.discardPreview() }
+                        .buttonStyle(.borderless)
+                    Button("Insert") { engine.acceptPreview() }
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    micButton
+                    if engine.state != .idle {
+                        Button { engine.cancelCurrentOperation() } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Cancel (Escape)")
+                    }
+                    if isWorking { processingIndicator }
+                    if engine.canUndoLastInsertion {
+                        Button { engine.undoLastInsertion() } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Undo last insertion")
+                    }
+                }
+                settingsButton
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
@@ -270,13 +313,13 @@ struct FloatingNodeView: View {
         switch engine.state {
         case .idle: engine.isModelLoaded ? DictatorBrand.yellow : .orange
         case .recording: .red
-        case .processing: DictatorBrand.cyan
+        case .processing, .preview: DictatorBrand.cyan
         case .typing: DictatorBrand.cyan
         }
     }
 
     private var isWorking: Bool {
-        engine.state == .processing || engine.state == .typing
+        engine.state == .processing || engine.state == .preview || engine.state == .typing
     }
 
     private var micIcon: String {
@@ -284,6 +327,7 @@ struct FloatingNodeView: View {
         case .idle: "mic.fill"
         case .recording: "stop.fill"
         case .processing: "brain.head.profile.fill"
+        case .preview: "pencil.and.list.clipboard"
         case .typing: "text.cursor"
         }
     }
