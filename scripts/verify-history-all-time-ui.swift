@@ -112,7 +112,32 @@ private func pressButton(label: String, in root: AXUIElement) -> Bool {
     return AXUIElementPerformAction(button, kAXPressAction as CFString) == .success
 }
 
-private func verifyAllTime(in window: AXUIElement, width: Int, height: Int) throws {
+private func assertRangeButton(_ label: String, in window: AXUIElement, domain: String, code: Int) throws {
+    guard pressButton(label: "Activity range: \(label)", in: window) else {
+        throw NSError(domain: domain, code: code, userInfo: [
+            NSLocalizedDescriptionKey: "\(label) activity filter is missing or not pressable"
+        ])
+    }
+    Thread.sleep(forTimeInterval: 0.3)
+}
+
+private func verifyDashboardRanges(in window: AXUIElement, width: Int, height: Int) throws {
+    setWindow(window, width: CGFloat(width), height: CGFloat(height))
+    Thread.sleep(forTimeInterval: 0.5)
+
+    guard pressButton(label: "Open Dashboard", in: window) else {
+        throw NSError(domain: "HistoryAllTimeUISmoke", code: 8, userInfo: [
+            NSLocalizedDescriptionKey: "Dashboard navigation button is missing or not pressable"
+        ])
+    }
+    Thread.sleep(forTimeInterval: 0.5)
+
+    try assertRangeButton("Today", in: window, domain: "HistoryAllTimeUISmoke", code: 9)
+    try assertRangeButton("This year", in: window, domain: "HistoryAllTimeUISmoke", code: 10)
+    try assertRangeButton("All time", in: window, domain: "HistoryAllTimeUISmoke", code: 11)
+}
+
+private func verifyHistoryRanges(in window: AXUIElement, width: Int, height: Int) throws {
     setWindow(window, width: CGFloat(width), height: CGFloat(height))
     Thread.sleep(forTimeInterval: 0.5)
 
@@ -123,12 +148,10 @@ private func verifyAllTime(in window: AXUIElement, width: Int, height: Int) thro
     }
     Thread.sleep(forTimeInterval: 0.5)
 
-    guard pressButton(label: "Activity range: All time", in: window) else {
-        throw NSError(domain: "HistoryAllTimeUISmoke", code: 4, userInfo: [
-            NSLocalizedDescriptionKey: "All time filter is missing or not pressable"
-        ])
-    }
-    Thread.sleep(forTimeInterval: 0.7)
+    try assertRangeButton("Today", in: window, domain: "HistoryAllTimeUISmoke", code: 4)
+    try assertRangeButton("This year", in: window, domain: "HistoryAllTimeUISmoke", code: 12)
+    try assertRangeButton("All time", in: window, domain: "HistoryAllTimeUISmoke", code: 13)
+    Thread.sleep(forTimeInterval: 0.5)
 
     let visibleLabels = descendants(of: window).flatMap(labels)
     let allTimeCardLabels = visibleLabels.filter { $0 == "complete stored history" }
@@ -145,7 +168,7 @@ private func verifyAllTime(in window: AXUIElement, width: Int, height: Int) thro
         ])
     }
 
-    print("PASS \(width)x\(height) cards=\(allTimeCardLabels.count) months=\(monthLabels.count)")
+    print("PASS \(width)x\(height) cards=\(allTimeCardLabels.count) months=\(monthLabels.count) dashboardFilters=ok historyFilters=ok")
 }
 
 guard AXIsProcessTrusted() else {
@@ -164,8 +187,10 @@ do {
         ])
     }
 
-    try verifyAllTime(in: window, width: 1400, height: 900)
-    try verifyAllTime(in: window, width: 900, height: 700)
+    try verifyDashboardRanges(in: window, width: 1400, height: 900)
+    try verifyHistoryRanges(in: window, width: 1400, height: 900)
+    try verifyDashboardRanges(in: window, width: 900, height: 700)
+    try verifyHistoryRanges(in: window, width: 900, height: 700)
     print("History all-time UI smoke test passed.")
 } catch {
     fputs("History all-time UI smoke test failed: \(error.localizedDescription)\n", stderr)

@@ -952,27 +952,33 @@ private struct HistoryMetricCard: View {
 }
 
 private enum ActivityRange: String, CaseIterable, Identifiable {
+    case today = "Today"
     case thisWeek = "This week"
     case lastSevenDays = "Last 7 days"
     case thisMonth = "This month"
+    case thisYear = "This year"
     case allTime = "All time"
 
     var id: String { rawValue }
 
     var metricPrefix: String {
         switch self {
+        case .today: "Today"
         case .thisWeek: "This Week"
         case .lastSevenDays: "Last 7 Days"
         case .thisMonth: "This Month"
+        case .thisYear: "This Year"
         case .allTime: "All Time"
         }
     }
 
     var periodLabel: String {
         switch self {
+        case .today: "today"
         case .thisWeek: "current calendar week"
         case .lastSevenDays: "rolling 7-day period"
         case .thisMonth: "current calendar month"
+        case .thisYear: "current calendar year"
         case .allTime: "complete stored history"
         }
     }
@@ -980,6 +986,9 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
     func dateInterval(calendar: Calendar, now: Date = Date()) -> DateInterval {
         let today = calendar.startOfDay(for: now)
         switch self {
+        case .today:
+            let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
+            return DateInterval(start: today, end: end)
         case .thisWeek:
             let weekday = calendar.component(.weekday, from: today)
             let daysFromMonday = (weekday + 5) % 7
@@ -993,14 +1002,17 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
         case .thisMonth:
             return calendar.dateInterval(of: .month, for: now)
                 ?? DateInterval(start: today, end: now)
+        case .thisYear:
+            return calendar.dateInterval(of: .year, for: now)
+                ?? DateInterval(start: today, end: now)
         case .allTime:
             let end = calendar.date(byAdding: .day, value: 1, to: today) ?? now
             return DateInterval(start: .distantPast, end: end)
         }
     }
 
-    static let dashboardRanges: [ActivityRange] = [.thisWeek, .lastSevenDays, .thisMonth]
-    static let historyRanges: [ActivityRange] = [.thisWeek, .lastSevenDays, .thisMonth, .allTime]
+    static let dashboardRanges: [ActivityRange] = [.today, .thisWeek, .lastSevenDays, .thisMonth, .thisYear, .allTime]
+    static let historyRanges: [ActivityRange] = dashboardRanges
 }
 
 private struct ConceptWeeklyActivityCard: View {
@@ -1013,6 +1025,9 @@ private struct ConceptWeeklyActivityCard: View {
     private var calendar: Calendar { .current }
     private var days: [DailyWordBucket] {
         switch selectedRange {
+        case .today:
+            let today = calendar.startOfDay(for: Date())
+            return dailyBuckets(startingAt: today, endingAt: today, calendar: calendar, history: history)
         case .thisWeek:
             let start = mondayStart(for: Date())
             let end = calendar.date(byAdding: .day, value: 6, to: start) ?? Date()
@@ -1025,7 +1040,7 @@ private struct ConceptWeeklyActivityCard: View {
             guard let interval = calendar.dateInterval(of: .month, for: Date()) else { return [] }
             let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? Date()
             return dailyBuckets(startingAt: interval.start, endingAt: end, calendar: calendar, history: history)
-        case .allTime:
+        case .thisYear, .allTime:
             return []
         }
     }
@@ -1062,9 +1077,12 @@ private struct ConceptWeeklyActivityCard: View {
 
     @ViewBuilder
     private var activityBody: some View {
-        if selectedRange == .allTime {
+        if selectedRange == .allTime || selectedRange == .thisYear {
             AllTimeActivityChart(
-                months: allTimeMonths,
+                months: selectedRange == .thisYear ? yearMonths : allTimeMonths,
+                emptyText: selectedRange == .thisYear
+                    ? "This year's activity will appear after your first dictation."
+                    : "All-time activity will appear after your first dictation.",
                 colorScheme: colorScheme
             )
             .padding(.top, 4)
@@ -1136,10 +1154,17 @@ private struct ConceptWeeklyActivityCard: View {
 
     private var activityTitle: String {
         switch selectedRange {
+        case .today: "Today's Activity"
         case .thisMonth: "Monthly Activity"
+        case .thisYear: "Yearly Activity"
         case .allTime: "All-Time Activity"
         case .thisWeek, .lastSevenDays: "Weekly Activity"
         }
+    }
+
+    private var yearMonths: [MonthlyActivityBucket] {
+        guard let interval = calendar.dateInterval(of: .year, for: Date()) else { return [] }
+        return monthlyActivityBuckets(calendar: calendar, history: history).filter { interval.contains($0.month) }
     }
 
     private var allTimeMonths: [MonthlyActivityBucket] {
@@ -1810,6 +1835,7 @@ private struct WeeklyWordBars: View {
 
 private struct AllTimeActivityChart: View {
     let months: [MonthlyActivityBucket]
+    var emptyText: String = "All-time activity will appear after your first dictation."
     let colorScheme: ColorScheme
     @State private var focusedMonth: Date?
 
@@ -1819,7 +1845,7 @@ private struct AllTimeActivityChart: View {
 
     var body: some View {
         if months.isEmpty {
-            EmptyStateLine(icon: "chart.bar.xaxis", text: "All-time activity will appear after your first dictation.")
+            EmptyStateLine(icon: "chart.bar.xaxis", text: emptyText)
         } else {
             ScrollView(.horizontal, showsIndicators: months.count > 8) {
                 HStack(alignment: .bottom, spacing: 12) {
@@ -2060,6 +2086,9 @@ private struct GeneralSection: View {
                 }
                 .pickerStyle(.segmented)
                 .font(.system(size: 13))
+                .onChange(of: settings.dictationLanguage) { _, _ in
+                    engine.reloadModel()
+                }
 
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "globe.europe.africa.fill")
@@ -2772,8 +2801,11 @@ private struct HistorySection: View {
     }
 
     private var selectedActivityBuckets: [DailyWordBucket] {
-        if selectedActivityRange == .allTime {
-            return monthlyActivityBuckets(calendar: calendar, history: memory.history).map { month in
+        if selectedActivityRange == .allTime || selectedActivityRange == .thisYear {
+            let interval = selectedActivityRange.dateInterval(calendar: calendar)
+            return monthlyActivityBuckets(calendar: calendar, history: memory.history).filter { month in
+                interval.contains(month.month)
+            }.map { month in
                 DailyWordBucket(
                     date: month.month,
                     words: month.words,

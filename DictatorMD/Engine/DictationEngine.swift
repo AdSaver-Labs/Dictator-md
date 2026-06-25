@@ -26,6 +26,7 @@ final class DictationEngine {
     private(set) var isHoldingForToggle: Bool = false
 
     private var whisperBridge: WhisperBridge?
+    private var loadedModelPath: String?
     private let audioCapture = AudioCapture()
     private let textInjector = TextInjector()
     private let soundFeedback = SoundFeedback()
@@ -114,7 +115,8 @@ final class DictationEngine {
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             do {
-                let modelPath = ModelManager.shared.activeModelPath()
+                let language = AppSettings.shared.dictationLanguage
+                let modelPath = ModelManager.shared.activeModelPath(for: language)
                 guard let modelPath else {
                     await MainActor.run {
                         self.modelLoadError = "No model found. Open Settings to download a model."
@@ -128,9 +130,10 @@ final class DictationEngine {
 
                 await MainActor.run {
                     self.whisperBridge = bridge
+                    self.loadedModelPath = modelPath
                     self.isModelLoaded = true
                     self.modelLoadError = nil
-                    DebugLog.shared.log("[DictationEngine] modelLoaded path=\(modelPath)")
+                    DebugLog.shared.log("[DictationEngine] modelLoaded path=\(modelPath) language=\(language.whisperCode)")
                 }
             } catch {
                 await MainActor.run {
@@ -145,6 +148,7 @@ final class DictationEngine {
         isModelLoaded = false
         modelLoadError = nil
         whisperBridge = nil
+        loadedModelPath = nil
         loadModelAsync()
     }
 
@@ -347,6 +351,14 @@ final class DictationEngine {
     private func startRecording() {
         guard state == .idle else {
             DebugLog.shared.log("[DictationEngine] startRecording ignored state=\(state.rawValue)")
+            return
+        }
+        let language = AppSettings.shared.dictationLanguage
+        if let requiredModelPath = ModelManager.shared.activeModelPath(for: language),
+           loadedModelPath != requiredModelPath {
+            DebugLog.shared.log("[DictationEngine] startRecording reloadModelForLanguage language=\(language.whisperCode) loaded=\(loadedModelPath ?? "nil") required=\(requiredModelPath)")
+            userFacingError = "Loading the best local model for \(language.label). Try again in a moment."
+            reloadModel()
             return
         }
         guard isModelLoaded else {

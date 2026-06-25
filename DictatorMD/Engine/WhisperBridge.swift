@@ -249,9 +249,12 @@ final class WhisperBridge: @unchecked Sendable {
         let topLanguage = Self.languageCode(for: topLanguageID) ?? "unknown"
 
         // Auto mode is intentionally restricted to the two languages the app supports.
-        // Default to English unless Bulgarian is clearly stronger.
+        // Bulgarian often loses a little probability to English on short mixed-tech
+        // prompts, so allow it when it is top-ranked or close enough to English.
         let chosen: AppSettings.DictationLanguage =
-            bulgarianProbability >= 0.05 && bulgarianProbability > englishProbability * 1.25
+            topLanguageID == bulgarianID
+            || bulgarianProbability >= 0.10
+            || (bulgarianProbability >= 0.03 && bulgarianProbability >= englishProbability * 0.85)
             ? .bulgarian
             : .english
 
@@ -284,7 +287,7 @@ final class WhisperBridge: @unchecked Sendable {
                 .joined(separator: "\n")
         case .bulgarian:
             languagePrompt = """
-            Транскрибирай на български език с българска кирилица. Не използвай руски думи и не превключвай към руски. Запазвай английски технически термини като Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent.
+            Транскрибирай на български език с българска кирилица. Не превеждай към английски. Не използвай латиница за български думи. Не използвай руски думи и не превключвай към руски. Запазвай английски технически термини като Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent.
             """
             userPrompt = prompt
         case .auto:

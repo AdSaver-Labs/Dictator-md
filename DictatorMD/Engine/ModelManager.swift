@@ -19,6 +19,8 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
         let isQuantized: Bool
 
         var id: String { fileName }
+        var isEnglishOnly: Bool { fileName.contains(".en") }
+        var isMultilingual: Bool { !isEnglishOnly && fileName != Self.vadSilero.fileName }
 
         // Full precision models
         static let base = ModelInfo(
@@ -117,14 +119,58 @@ final class ModelManager: ObservableObject, @unchecked Sendable {
         AppPaths.supportSubdirectory("Models")
     }
 
-    func activeModelPath() -> String? {
+    func activeModelInfo(for language: AppSettings.DictationLanguage = AppSettings.shared.dictationLanguage) -> ModelInfo? {
         let selectedModel = AppSettings.shared.selectedModel
-        // Try exact match first, then contains
-        let info = ModelInfo.all.first { $0.fileName == "ggml-\(selectedModel).bin" }
+        let selectedInfo = ModelInfo.all.first { $0.fileName == "ggml-\(selectedModel).bin" }
             ?? ModelInfo.all.first { $0.fileName.contains(selectedModel) }
-            ?? ModelInfo.smallEnQ5
+
+        let downloaded = downloadedModels()
+        let downloadedSelected = selectedInfo.flatMap { info in
+            downloaded.first { $0.fileName == info.fileName }
+        }
+
+        switch language {
+        case .english:
+            return downloadedSelected
+                ?? downloaded.first { $0.fileName == ModelInfo.smallEnQ5.fileName }
+                ?? downloaded.first { $0.fileName == ModelInfo.smallQ5.fileName }
+                ?? downloaded.first
+        case .auto:
+            return bestDownloadedMultilingual(from: downloaded)
+                ?? downloadedSelected
+                ?? downloaded.first
+        case .bulgarian:
+            // Bulgarian quality depends on a multilingual model. Prefer the strongest
+            // downloaded multilingual checkpoint instead of an English-only selection.
+            return bestDownloadedMultilingual(from: downloaded)
+                ?? downloadedSelected
+                ?? downloaded.first
+        }
+    }
+
+    func activeModelPath() -> String? {
+        activeModelPath(for: AppSettings.shared.dictationLanguage)
+    }
+
+    func activeModelPath(for language: AppSettings.DictationLanguage) -> String? {
+        guard let info = activeModelInfo(for: language) else { return nil }
         let path = modelsDirectory.appendingPathComponent(info.fileName).path
         return fileManager.fileExists(atPath: path) ? path : nil
+    }
+
+    func bestDownloadedMultilingual(from downloaded: [ModelInfo]? = nil) -> ModelInfo? {
+        let downloaded = downloaded ?? downloadedModels()
+        let preferredOrder = [
+            ModelInfo.medium.fileName,
+            ModelInfo.mediumQ5.fileName,
+            ModelInfo.small.fileName,
+            ModelInfo.smallQ5.fileName,
+            ModelInfo.base.fileName,
+            ModelInfo.baseQ5.fileName
+        ]
+        return preferredOrder.compactMap { fileName in
+            downloaded.first { $0.fileName == fileName }
+        }.first
     }
 
     func vadModelPath() -> String? {
