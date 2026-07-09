@@ -36,7 +36,7 @@ final class SettingsWindowController {
             window.title = "Dictator-md"
             window.isReleasedWhenClosed = false
             window.contentViewController = hostingController
-            window.minSize = NSSize(width: 920, height: 680)
+            window.minSize = SettingsView.minimumWindowSize
             window.level = .normal
             window.collectionBehavior = [.managed, .fullScreenPrimary]
             window.ignoresMouseEvents = false
@@ -111,7 +111,7 @@ struct WindowConfigurator: NSViewRepresentable {
         guard let window else { return }
         window.title = "Dictator-md"
         window.styleMask.insert([.titled, .closable, .miniaturizable, .resizable])
-        window.minSize = NSSize(width: 920, height: 680)
+        window.minSize = SettingsView.minimumWindowSize
         window.isMovable = true
         window.ignoresMouseEvents = false
         if !context.coordinator.didConfigure {

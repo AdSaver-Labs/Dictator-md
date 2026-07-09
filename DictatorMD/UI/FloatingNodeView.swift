@@ -222,6 +222,7 @@ struct FloatingNodeView: View {
                 }
             }
             .shadow(color: statusColor.opacity(isWorking ? 0.44 : 0.28), radius: isWorking ? 8 : 4)
+            .clipShape(Capsule())
             .contentShape(Capsule())
             .accessibilityLabel("Dictation node")
             .onTapGesture {

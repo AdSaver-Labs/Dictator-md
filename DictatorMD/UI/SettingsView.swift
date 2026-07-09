@@ -40,6 +40,8 @@ private extension AppSettings.AppearanceMode {
 // MARK: - Settings Window
 
 struct SettingsView: View {
+    static let minimumWindowSize = NSSize(width: 760, height: 540)
+
     let engine: DictationEngine
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var modelManager = ModelManager.shared
@@ -101,7 +103,12 @@ struct SettingsView: View {
                 detailPane
             }
         }
-        .frame(minWidth: 920, idealWidth: 1200, minHeight: 680, idealHeight: 820)
+        .frame(
+            minWidth: Self.minimumWindowSize.width,
+            idealWidth: 1200,
+            minHeight: Self.minimumWindowSize.height,
+            idealHeight: 820
+        )
         .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding)
@@ -144,6 +151,23 @@ struct SettingsView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
+        ViewThatFits(in: .vertical) {
+            sidebarContent
+
+            ScrollView(.vertical, showsIndicators: true) {
+                sidebarContent
+                    .padding(.vertical, 1)
+            }
+        }
+        .frame(width: 220)
+        .background(
+            colorScheme == .dark
+                ? Color.black.opacity(0.28)
+                : Color.white.opacity(0.50)
+        )
+    }
+
+    private var sidebarContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(spacing: 12) {
                 DictatorLogoMark(size: 82, cornerRadius: 18)
@@ -157,8 +181,8 @@ struct SettingsView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, 54)
-            .padding(.bottom, 30)
+            .padding(.top, 30)
+            .padding(.bottom, 22)
 
             ForEach(SettingsSection.allCases) { section in
                 Button {
@@ -218,11 +242,6 @@ struct SettingsView: View {
             .padding(.bottom, 12)
         }
         .frame(width: 220)
-        .background(
-            colorScheme == .dark
-                ? Color.black.opacity(0.28)
-                : Color.white.opacity(0.50)
-        )
     }
 
     // MARK: - Detail Pane
