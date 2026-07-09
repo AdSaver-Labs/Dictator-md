@@ -15,7 +15,8 @@ final class FloatingNodeController {
     private weak var engine: DictationEngine?
     var openSettingsAction: (() -> Void)?
 
-    private let collapsedPanelSize = NSSize(width: 104, height: 20)
+    private let collapsedIdlePanelSize = NSSize(width: 92, height: 5)
+    private let collapsedWorkingPanelSize = NSSize(width: 74, height: 12)
     private let expandedPanelSize = NSSize(width: 276, height: 58)
     private let previewPanelSize = NSSize(width: 360, height: 132)
     private let bottomOffset: CGFloat = 14
@@ -34,7 +35,7 @@ final class FloatingNodeController {
     func show(engine: DictationEngine) {
         if panel == nil {
             let panel = FloatingNodePanel(
-                contentRect: NSRect(x: 0, y: 0, width: collapsedPanelSize.width, height: collapsedPanelSize.height),
+                contentRect: NSRect(x: 0, y: 0, width: collapsedIdlePanelSize.width, height: collapsedIdlePanelSize.height),
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
@@ -89,7 +90,7 @@ final class FloatingNodeController {
         let size: NSSize
         switch presentation {
         case .collapsed:
-            size = collapsedPanelSize
+            size = collapsedPanelSize()
         case .expanded:
             size = expandedPanelSize
         case .preview:
@@ -121,6 +122,15 @@ final class FloatingNodeController {
             return panelScreen
         }
         return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private func collapsedPanelSize() -> NSSize {
+        guard let engine else { return collapsedIdlePanelSize }
+        return isWorking(engine.state) ? collapsedWorkingPanelSize : collapsedIdlePanelSize
+    }
+
+    private func isWorking(_ state: DictationState) -> Bool {
+        state == .processing || state == .preview || state == .typing
     }
 
     @objc private func displayConfigurationDidChange() {
@@ -180,8 +190,11 @@ struct FloatingNodeView: View {
             collapseWorkItem = nil
         }
         .onChange(of: engine.state) { _, state in
-            guard isHovering else { return }
-            presentationChanged(state == .preview ? .preview : .expanded)
+            if isHovering {
+                presentationChanged(state == .preview ? .preview : .expanded)
+            } else {
+                presentationChanged(.collapsed)
+            }
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true)) {
@@ -192,23 +205,23 @@ struct FloatingNodeView: View {
 
     private var collapsedNode: some View {
         Capsule()
-            .fill(statusColor.opacity(0.58))
+            .fill(statusColor.opacity(0.72))
             .frame(width: isWorking ? 74 : 92, height: isWorking ? 12 : 5)
             .background(
                 Capsule()
                     .fill(.ultraThinMaterial)
-                    .opacity(0.65)
+                    .opacity(0.76)
             )
             .overlay(
                 Capsule()
-                    .stroke(statusColor.opacity(0.78), lineWidth: 1.2)
+                    .stroke(statusColor.opacity(0.92), lineWidth: 1.2)
             )
             .overlay {
                 if isWorking {
                     LoadingDots(color: .white, dotSize: 3.6, spacing: 4)
                 }
             }
-            .shadow(color: statusColor.opacity(isWorking ? 0.38 : 0.22), radius: isWorking ? 8 : 4)
+            .shadow(color: statusColor.opacity(isWorking ? 0.44 : 0.28), radius: isWorking ? 8 : 4)
             .contentShape(Capsule())
             .accessibilityLabel("Dictation node")
             .onTapGesture {
@@ -290,7 +303,7 @@ struct FloatingNodeView: View {
                 .monospacedDigit()
                 .frame(width: 42, height: 28)
                 .foregroundStyle(statusColor)
-                .background(Capsule().fill(statusColor.opacity(0.13)))
+                .background(Capsule().fill(statusColor.opacity(0.18)))
         }
         .buttonStyle(.plain)
         .help("Switch language")
@@ -306,8 +319,8 @@ struct FloatingNodeView: View {
                 .foregroundStyle(engine.state == .idle ? DictatorBrand.ink : .white)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(statusColor))
-                .overlay(Circle().stroke(Color.white.opacity(engine.state == .idle ? 0.26 : 0.16), lineWidth: 1))
-                .shadow(color: statusColor.opacity(0.42), radius: 10)
+                .overlay(Circle().stroke(Color.white.opacity(engine.state == .idle ? 0.30 : 0.20), lineWidth: 1))
+                .shadow(color: statusColor.opacity(0.48), radius: 10)
         }
         .buttonStyle(.plain)
         .help(engine.state == .recording ? "Stop dictation" : "Start dictation")
@@ -327,7 +340,7 @@ struct FloatingNodeView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(statusColor.opacity(0.10)))
+                .background(Circle().fill(statusColor.opacity(0.14)))
         }
         .buttonStyle(.plain)
         .help("Open settings")
@@ -336,9 +349,9 @@ struct FloatingNodeView: View {
     private var statusColor: Color {
         switch engine.state {
         case .idle: engine.isModelLoaded ? DictatorBrand.yellow : .orange
-        case .recording: .red
-        case .processing, .preview: DictatorBrand.cyan
-        case .typing: DictatorBrand.cyan
+        case .recording: Color(red: 1.0, green: 0.18, blue: 0.22)
+        case .processing, .preview: Color(red: 0.24, green: 0.72, blue: 1.0)
+        case .typing: Color(red: 0.24, green: 0.72, blue: 1.0)
         }
     }
 

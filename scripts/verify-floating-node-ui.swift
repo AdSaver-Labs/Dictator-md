@@ -60,7 +60,7 @@ guard AXValueGetValue(axSize, .cgSize, &size) else {
     exit(1)
 }
 
-guard size.width <= 120, size.height <= 24 else {
+guard size.width <= 92, size.height <= 12 else {
     fputs("Collapsed floating node captures too much screen space: \(Int(size.width))x\(Int(size.height)).\n", stderr)
     exit(1)
 }
