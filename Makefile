@@ -44,7 +44,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke
 
 all: whisper app
 
@@ -139,6 +139,9 @@ node-smoke:
 
 history-smoke:
 	xcrun swift scripts/verify-history-all-time-ui.swift
+
+dashboard-resize-smoke:
+	xcrun swift scripts/verify-dashboard-resize-ui.swift
 
 run: app
 	open "$(APP_BUNDLE)"

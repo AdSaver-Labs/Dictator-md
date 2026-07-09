@@ -622,7 +622,7 @@ private struct DashboardSection: View {
 
     @ViewBuilder
     private var dashboardPanels: some View {
-        if availableWidth >= 900 {
+        if availableWidth >= 1040 {
             HStack(alignment: .top, spacing: 12) {
                 ConceptWeeklyActivityCard(
                     history: memory.history,
@@ -661,6 +661,7 @@ private struct DashboardSection: View {
 
                     ConceptRecentDictationsCard(history: Array(memory.history.prefix(4)), colorScheme: colorScheme)
                 }
+                .frame(maxWidth: .infinity)
             }
         } else {
             VStack(spacing: 12) {
@@ -897,7 +898,7 @@ private struct DashboardTopController: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.65), lineWidth: 1)
         )
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .accessibilityLabel("Floating dictation controller preview")
     }
 
