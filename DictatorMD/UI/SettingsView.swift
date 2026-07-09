@@ -350,6 +350,7 @@ private struct SidebarRow: View {
 private struct SidebarSystemStatusCard: View {
     let engine: DictationEngine
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var updater = AppUpdater.shared
     let colorScheme: ColorScheme
 
     var body: some View {
@@ -387,6 +388,27 @@ private struct SidebarSystemStatusCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(engine.isModelLoaded ? AppTheme.readyGreen : .orange)
             }
+
+            Divider().opacity(0.35)
+
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(updateDotColor)
+                    .frame(width: 8, height: 8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(updateTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(updater.statusText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                updateButton
+            }
         }
         .padding(14)
         .background(
@@ -397,6 +419,68 @@ private struct SidebarSystemStatusCard: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06), lineWidth: 1)
         )
+        .onAppear {
+            updater.checkForUpdates()
+        }
+    }
+
+    @ViewBuilder
+    private var updateButton: some View {
+        switch updater.state {
+        case .available:
+            Button("Update") {
+                updater.installAvailableUpdate()
+            }
+            .font(.system(size: 10, weight: .bold))
+            .buttonStyle(.borderedProminent)
+            .controlSize(.mini)
+            .tint(AppTheme.cyan)
+        case .downloading, .installing:
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 24, height: 20)
+        case .failed:
+            Button {
+                updater.checkForUpdates(force: true)
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+        default:
+            Button {
+                updater.checkForUpdates(force: true)
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Check for updates")
+        }
+    }
+
+    private var updateTitle: String {
+        switch updater.state {
+        case .available: "Update Available"
+        case .downloading: "Downloading"
+        case .installing: "Installing"
+        case .failed: "Updater"
+        case .checking: "Checking"
+        case .upToDate: "App Updated"
+        case .idle: "App Updates"
+        }
+    }
+
+    private var updateDotColor: Color {
+        switch updater.state {
+        case .available: AppTheme.cyan
+        case .downloading, .installing, .checking: AppTheme.logoYellow
+        case .failed: .red
+        case .upToDate: AppTheme.readyGreen
+        case .idle: .secondary
+        }
     }
 }
 

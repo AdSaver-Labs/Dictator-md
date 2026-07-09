@@ -18,6 +18,7 @@ SWIFT_FILES := \
 	DictatorMD/Utilities/Settings.swift \
 	DictatorMD/Utilities/AppPaths.swift \
 	DictatorMD/Utilities/DebugLog.swift \
+	DictatorMD/Utilities/AppUpdater.swift \
 	DictatorMD/Utilities/DictationMemory.swift \
 	DictatorMD/Engine/WhisperBridge.swift \
 	DictatorMD/Engine/AudioCapture.swift \

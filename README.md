@@ -71,14 +71,16 @@ Dictator-md runs **100% locally**. Your audio never leaves your Mac. There is no
 
 ```bash
 grep -rE "URLSession|http" DictatorMD/**/*.swift
-# Only match: ModelManager.swift (fetches Whisper models from HuggingFace when you click Download)
+# Matches:
+# - ModelManager.swift (fetches Whisper models from HuggingFace when you click Download)
+# - AppUpdater.swift (checks GitHub Releases and downloads the signed DMG when you click Update)
 ```
 
 ### What we don't do
 
 - ❌ Send audio or transcriptions anywhere
 - ❌ Track, analyze, or log anything
-- ❌ Phone home, auto-update, or license-check
+- ❌ Auto-install updates without your click, telemetry, or license-check
 - ❌ Read your clipboard
 - ❌ Load web fonts or external scripts
 - ❌ Require an account or an internet connection
@@ -88,6 +90,8 @@ See the full [Privacy breakdown](https://dictatormd.app/privacy.html) and [SECUR
 ## Install (DMG)
 
 Download the latest `.dmg` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), open it, and drag Dictator-md to Applications.
+
+Dictator-md checks GitHub Releases for newer versions. When an update is available, the sidebar status card shows an **Update** button; clicking it downloads the release DMG, verifies the SHA256 checksum when present, installs the new app, and relaunches.
 
 > **Note: The app is not notarized by Apple.** macOS will block it on first launch. To open it on Mac:
 > 1. Open Dictator-md -- macOS will show a warning that it can't verify the developer
