@@ -9,6 +9,9 @@ required_refs=(
   "AGENTS.md:Confirm the active execution runtime is Codex/OpenAI Codex"
   "AGENTS.md:Do not route Dictator MD implementation to Jacques"
   "AGENTS.md:proof package"
+  "AGENTS.md:Local Mac Codex Compatibility"
+  "AGENTS.md:Local Mac Codex work is allowed"
+  "AGENTS.md:fetch and rebase instead of force-pushing"
 )
 
 status=0

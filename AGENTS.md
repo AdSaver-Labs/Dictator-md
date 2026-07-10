@@ -27,6 +27,20 @@ Before any meaningful Dictator MD code change through OpenClaw:
 4. Keep the proof package with the change: diff summary, tests/builds or blocker, privacy note, and current-dictation regression note.
 5. Run `scripts/verify-codex-routing.sh` before claiming the repo is ready for OpenClaw-managed Dictator MD development.
 
+## Local Mac Codex Compatibility
+
+Alej may also run Codex locally on a Mac against this same repository.
+
+Local Mac Codex work is allowed and should follow this file as normal repo guidance. These OpenClaw routing rules do not install hooks, block commits, change remotes, or prevent local Mac Codex from implementing and pushing changes.
+
+To avoid collisions between the VPS/OpenClaw clone and Alej's Mac clone:
+
+1. Pull or rebase from `origin/main` before starting work.
+2. Keep each change small and push promptly after verification.
+3. If Git rejects a push because the other environment pushed first, fetch and rebase instead of force-pushing.
+4. Never use force-push or destructive resets unless Alej explicitly approves.
+5. Mention in the completion summary whether the work was done from OpenClaw/Codex or local Mac Codex.
+
 ## Current Product Invariant
 
 Do not break the current dictation product:
