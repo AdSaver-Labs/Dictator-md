@@ -1,6 +1,6 @@
 # Dictator-md for Windows
 
-This is the native Windows prototype scaffold. The macOS app remains the working reference product.
+This is the native Windows preview scaffold. The macOS app remains the working reference product while Windows catches up.
 
 The Windows shell is intentionally native because these parts need system-level behavior:
 
@@ -12,7 +12,7 @@ The Windows shell is intentionally native because these parts need system-level 
 
 ## Current Status
 
-**Prototype scaffold only. This is not a finished Windows dictation app yet.**
+**Windows preview only. This is not a finished Windows dictation app yet.**
 
 Implemented:
 
@@ -32,7 +32,27 @@ Not implemented yet:
 - history/vocabulary UI
 - installer
 
-## Build On Windows
+## Download On Windows
+
+Go to the latest GitHub Release:
+
+https://github.com/AdSaver-Labs/Dictator-md/releases/latest
+
+Download:
+
+```text
+Dictator-md-windows-preview.zip
+```
+
+Extract the zip and run:
+
+```powershell
+.\Dictator-md.exe
+```
+
+The Windows preview currently validates the native tray app, Right Alt hotkey, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
+
+## Build On Windows From Source
 
 Requirements:
 
@@ -61,7 +81,7 @@ Run:
 .\build\windows\Release\Dictator-md.exe
 ```
 
-## Prototype Behavior
+## Preview Behavior
 
 Press `Right Alt` to trigger the pipeline. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
 
@@ -78,8 +98,7 @@ For a full friend/tester checklist, see [`../../docs/WINDOWS_MANUAL_TESTING.md`]
 - The app does not record from the microphone yet.
 - The app does not transcribe speech yet.
 - The app uses clipboard-based paste insertion and may overwrite clipboard content.
-- There is no installer; testers must build from source.
-- There is no Windows release artifact yet.
+- There is no installer yet; download the release zip and run the executable.
 
 ## Useful Feedback
 

@@ -87,7 +87,9 @@ grep -rE "URLSession|http" DictatorMD/**/*.swift
 
 See the full [Privacy breakdown](https://dictatormd.app/privacy.html) and [SECURITY.md](SECURITY.md) for the threat model and disclosure policy.
 
-## Install (DMG)
+## Install
+
+### macOS
 
 Download the latest `.dmg` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), open it, and drag Dictator-md to Applications.
 
@@ -100,6 +102,12 @@ Dictator-md checks GitHub Releases for newer versions. When an update is availab
 > 4. Click **Open** in the confirmation dialog
 >
 > You only need to do this once. After that, the app opens normally.
+
+### Windows Preview
+
+Download `Dictator-md-windows-preview.zip` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), extract it, and run `Dictator-md.exe`.
+
+The Windows build is currently a preview: tray app, Right Alt hotkey, focused-window tracking, and text insertion are wired. Real microphone capture and local Whisper transcription are still being ported, so the Windows build is not yet equivalent to the macOS dictation app.
 
 Or build from source:
 

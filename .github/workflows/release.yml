@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  build-and-release:
+  macos-release:
     runs-on: macos-15
     permissions:
       contents: write
@@ -53,3 +53,62 @@ jobs:
             shasum -a 256 Dictator-md.dmg
             ```
             Expected SHA256: see `Dictator-md.dmg.sha256` attached to this release.
+
+  windows-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure Windows app
+        run: cmake -S apps/windows -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Windows app
+        run: cmake --build build/windows
+
+      - name: Package Windows zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/windows-package | Out-Null
+          Copy-Item build/windows/Dictator-md.exe build/windows-package/Dictator-md.exe
+          Copy-Item apps/windows/README.md build/windows-package/README-Windows.md
+          @"
+          Dictator-md for Windows
+          =======================
+
+          This is the current native Windows preview build.
+
+          How to run:
+          1. Extract this zip.
+          2. Double-click Dictator-md.exe.
+          3. Look for the Dictator-md tray icon.
+          4. Press Right Alt to test insertion into the focused text box.
+
+          Current limitation:
+          This Windows preview validates tray, hotkey, focus tracking, and text insertion.
+          Real microphone capture + local Whisper transcription are still being ported.
+          "@ | Set-Content -Encoding UTF8 build/windows-package/START-HERE.txt
+          Compress-Archive -Path build/windows-package/* -DestinationPath build/Dictator-md-windows-preview.zip -Force
+          Get-FileHash build/Dictator-md-windows-preview.zip -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  Dictator-md-windows-preview.zip" } | Set-Content -Encoding ASCII build/Dictator-md-windows-preview.zip.sha256
+
+      - name: Upload Windows assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/Dictator-md-windows-preview.zip
+            build/Dictator-md-windows-preview.zip.sha256
+          generate_release_notes: true
+          append_body: true
+          body: |
+
+            ### Windows preview
+            This release includes `Dictator-md-windows-preview.zip`.
+
+            The Windows build currently validates the native tray app, Right Alt hotkey, focused-window tracking, and text insertion path. Full microphone capture and local Whisper transcription are still being ported.
