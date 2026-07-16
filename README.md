@@ -7,7 +7,7 @@
   </p>
   <p align="center">
     <a href="https://dictatormd.app/">Website</a> &bull;
-    <a href="#install-dmg">Download</a> &bull;
+    <a href="DOWNLOAD.md">Download</a> &bull;
     <a href="#quick-start">Quick Start</a> &bull;
     <a href="#windows-status">Windows Status</a> &bull;
     <a href="#features">Features</a> &bull;
@@ -29,6 +29,15 @@
 **Free. Local. Private. No cloud. No API keys. No subscriptions. No data leaves your Mac.**
 
 Dictator-md is a **free, open-source macOS dictation app** -- a local alternative to [Willow Voice](https://www.heywillow.io/), [WisprFlow](https://wisprflow.com/), and Apple Dictation. It runs OpenAI's [Whisper](https://github.com/openai/whisper) speech recognition model entirely on your machine using [whisper.cpp](https://github.com/ggerganov/whisper.cpp) with Metal GPU acceleration. Your voice never leaves your computer.
+
+## Download First
+
+For direct download instructions, start here:
+
+- [`DOWNLOAD.md`](DOWNLOAD.md)
+- Latest GitHub Release: https://github.com/AdSaver-Labs/Dictator-md/releases/latest
+
+Use `Dictator-md.dmg` for macOS and `Dictator-md-windows-preview.zip` for the current Windows preview.
 
 ## Windows Status
 

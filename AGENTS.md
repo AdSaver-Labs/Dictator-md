@@ -1,5 +1,17 @@
 # AGENTS.md - Dictator MD
 
+## Read This First
+
+This file is the operating guide for AI agents working in this repository.
+
+Before making changes, read:
+
+1. `README.md` - product overview and public-facing setup.
+2. `DOWNLOAD.md` - human download instructions.
+3. `docs/UI_QUALITY_PROTOCOL.md` - UI verification rules.
+4. `docs/WINDOWS_PORT_EXECUTION.md` - Windows status and direction.
+5. `docs/WINDOWS_MANUAL_TESTING.md` - Windows tester checklist.
+
 ## Project Purpose
 
 Dictator MD is no longer only a local macOS dictation utility. Its long-term direction is a local/private voice platform for humans and agents:
@@ -54,6 +66,73 @@ Do not break the current dictation product:
 
 Any voice-platform expansion must preserve this working core.
 
+## Current Platform Status
+
+### macOS
+
+macOS is the primary working product.
+
+Working:
+
+- SwiftUI app.
+- Local whisper.cpp transcription.
+- Microphone capture.
+- Accessibility-based hotkey/text insertion.
+- Floating node.
+- History/statistics/vocabulary.
+- GitHub Release DMG.
+- In-app GitHub release updater.
+
+Release asset:
+
+- `Dictator-md.dmg`
+
+### Windows
+
+Windows is currently a preview, not the finished dictation product.
+
+Working:
+
+- Native Win32 tray app.
+- Right Alt hotkey.
+- Foreground/focused-window capture.
+- Clipboard plus `SendInput` insertion path.
+- GitHub Release zip artifact.
+
+Not working yet:
+
+- Microphone capture.
+- Local Whisper transcription.
+- Settings/history/vocabulary UI.
+- Installer.
+
+Release asset:
+
+- `Dictator-md-windows-preview.zip`
+
+Do not describe Windows as fully functional until microphone capture and local Whisper transcription are actually implemented and verified.
+
+## Human Download Contract
+
+Humans should not need to build from source.
+
+Point them to:
+
+- `DOWNLOAD.md`
+- https://github.com/AdSaver-Labs/Dictator-md/releases/latest
+
+Use these exact asset names:
+
+- macOS: `Dictator-md.dmg`
+- Windows preview: `Dictator-md-windows-preview.zip`
+
+If an agent changes release packaging, it must update:
+
+- `DOWNLOAD.md`
+- `README.md`
+- `.github/workflows/release.yml`
+- the relevant platform README under `apps/`
+
 ## Architecture Direction
 
 Prefer incremental modules over broad rewrites:
@@ -76,6 +155,63 @@ Keep agent adapters pluggable. Do not hardcode Dexter, OpenClaw, or any single p
 - Keep local/offline and cloud/agent-connected modes clearly separated.
 - Do not store sensitive audio/transcripts without explicit settings and user control.
 - Do not add external services as required dependencies without approval.
+
+## Verification Commands
+
+Use the smallest relevant set, then report exactly what passed or why it could not run.
+
+macOS build:
+
+```bash
+make app
+```
+
+Install local macOS build:
+
+```bash
+make install-local
+```
+
+UI checks:
+
+```bash
+make node-smoke
+make history-smoke
+make ui-smoke
+make dashboard-resize-smoke
+```
+
+Windows build is verified by GitHub Actions on `windows-latest`. Do not claim a Windows build passes unless the Windows CI/release job passed or a real Windows machine built it successfully.
+
+## Release Rules
+
+When publishing a user-visible release:
+
+1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `DictatorMD/Info.plist`.
+2. Commit and push `main`.
+3. Tag the same version as `vX.Y.Z`.
+4. Push the tag.
+5. Confirm GitHub Actions finished successfully.
+6. Confirm the release contains the expected assets:
+   - `Dictator-md.dmg`
+   - `Dictator-md.dmg.sha256`
+   - `Dictator-md-windows-preview.zip`
+   - `Dictator-md-windows-preview.zip.sha256`
+
+Do not tell users an update is available until the GitHub Release assets are uploaded.
+
+## Git Safety
+
+This repo may be edited from multiple environments, including local Mac Codex and VPS/OpenClaw.
+
+Before pushing:
+
+```bash
+git fetch origin main
+git rebase origin/main
+```
+
+If push is rejected, fetch and rebase. Never force-push unless Alej explicitly approves.
 
 ## First Preferred Slice
 
