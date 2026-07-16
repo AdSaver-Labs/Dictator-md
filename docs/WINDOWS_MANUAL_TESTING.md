@@ -10,7 +10,7 @@ What works today:
 
 - Native Win32 app launches.
 - Tray icon/menu is created.
-- Global hotkey registration is wired.
+- Global hotkey registration is wired, with fallback shortcuts if Right Alt is unavailable on the tester's keyboard layout.
 - The app can detect the foreground window.
 - The app can paste text into the focused application using clipboard + `SendInput`.
 - Pressing the prototype hotkey inserts a placeholder sentence.
@@ -112,7 +112,7 @@ Fail if:
 
 ### 2. Placeholder insertion
 
-Open Notepad, click into the empty document, then press **Right Alt**.
+Open Notepad, click into the empty document, then press the registered hotkey. Dictator-md first tries **Right Alt**, then **F8**, then **Ctrl+Alt+Space**.
 
 Pass if placeholder text appears:
 
@@ -129,7 +129,7 @@ Fail if:
 
 ### 3. Browser text field insertion
 
-Open a browser, click into a normal text field, and press **Right Alt**.
+Open a browser, click into a normal text field, and press the registered hotkey.
 
 Pass if the placeholder text appears in the field.
 
@@ -137,7 +137,7 @@ Fail if it inserts somewhere else or does nothing.
 
 ### 4. Cursor / code editor insertion
 
-Open Cursor, VS Code, or another editor. Click into a text file and press **Right Alt**.
+Open Cursor, VS Code, or another editor. Click into a text file and press the registered hotkey.
 
 Pass if the placeholder text appears at the cursor.
 
@@ -170,7 +170,7 @@ Please send:
 - Whether build succeeded.
 - Whether app launched.
 - Whether tray icon appeared.
-- Whether Right Alt inserted placeholder text in:
+- Whether the registered hotkey inserted placeholder text in:
   - Notepad
   - browser field
   - Cursor / VS Code
@@ -188,4 +188,3 @@ Before Windows can become a real dictation app, the next engineering work is:
 5. Real transcript insertion instead of placeholder text.
 6. Safer text injection with clipboard restore or UI Automation where possible.
 7. Installer/release packaging.
-

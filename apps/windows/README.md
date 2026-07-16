@@ -50,7 +50,7 @@ Extract the zip and run:
 .\Dictator-md.exe
 ```
 
-The Windows preview currently validates the native tray app, Right Alt hotkey, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
+The Windows preview currently validates the native tray app, hotkey registration, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
 
 ## Build On Windows From Source
 
@@ -83,7 +83,7 @@ Run:
 
 ## Preview Behavior
 
-Press `Right Alt` to trigger the pipeline. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
+Press the registered hotkey to trigger the pipeline. Dictator-md first tries `Right Alt`, then falls back to `F8`, then `Ctrl+Alt+Space` if Windows refuses the earlier options. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
 
 ```text
 Dictator-md Windows insertion test.
@@ -110,7 +110,7 @@ Please report:
 - CMake version
 - build success/failure
 - whether tray icon appears
-- whether `Right Alt` inserts placeholder text into Notepad
+- whether the registered hotkey inserts placeholder text into Notepad
 - whether insertion works in browser text fields
 - whether insertion works in Cursor/VS Code
 - whether clipboard content is overwritten

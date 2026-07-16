@@ -92,7 +92,7 @@ Windows now has a native CMake/Win32 tray scaffold under `apps/windows`.
 Implemented in the scaffold:
 - Hidden message window.
 - Tray icon and menu.
-- Prototype Right Alt hotkey registration.
+- Prototype hotkey registration with Right Alt first and safer fallback shortcuts after that.
 - Focus target capture at dictation start.
 - Clipboard plus `Ctrl+V` text insertion path.
 - GitHub Actions Windows build job.
