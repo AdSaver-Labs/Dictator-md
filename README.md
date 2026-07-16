@@ -116,7 +116,7 @@ Dictator-md checks GitHub Releases for newer versions. When an update is availab
 
 Download `Dictator-md-windows-preview.zip` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), extract it, and run `Dictator-md.exe`.
 
-The Windows build is currently a preview: tray app, hotkey registration, focused-window tracking, and text insertion are wired. Real microphone capture and local Whisper transcription are still being ported, so the Windows build is not yet equivalent to the macOS dictation app. If Right Alt is unavailable on a given Windows keyboard layout, the app falls back to F8 and then Ctrl+Alt+Space.
+The Windows build is currently a preview: tray app, hotkey registration, focused-window tracking, and text insertion are wired. Real microphone capture and local Whisper transcription are still being ported, so the Windows build is not yet equivalent to the macOS dictation app. If Right Alt is unavailable on a given Windows keyboard layout, the app silently falls back to F8 and then Ctrl+Alt+Space without blocking launch.
 
 Or build from source:
 

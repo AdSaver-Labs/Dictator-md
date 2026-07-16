@@ -83,7 +83,7 @@ Run:
 
 ## Preview Behavior
 
-Press the registered hotkey to trigger the pipeline. Dictator-md first tries `Right Alt`, then falls back to `F8`, then `Ctrl+Alt+Space` if Windows refuses the earlier options. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
+Press the registered hotkey to trigger the pipeline. Dictator-md first tries `Right Alt`, then silently falls back to `F8`, then `Ctrl+Alt+Space` if Windows refuses the earlier options. The app still opens even when a preferred hotkey is unavailable; check the tray menu to see the active test hotkey. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
 
 ```text
 Dictator-md Windows insertion test.

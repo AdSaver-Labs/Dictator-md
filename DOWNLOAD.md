@@ -41,7 +41,7 @@ The Windows app is currently a preview, not the full dictation product yet.
 Current Windows preview behavior:
 
 - Tray app launches.
-- Right Alt is tried first, with F8 and Ctrl+Alt+Space as automatic fallbacks if Windows refuses it.
+- Right Alt is tried first, with F8 and Ctrl+Alt+Space as silent automatic fallbacks if Windows refuses it.
 - Focused-window tracking is wired.
 - Text insertion path is wired.
 - It inserts a placeholder test sentence.

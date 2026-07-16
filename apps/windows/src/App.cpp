@@ -13,20 +13,12 @@ int App::run(HINSTANCE instance, int showCommand) {
         return 1;
     }
 
-    const bool hotkeyRegistered = hotkey_.registerDefault(window_);
+    hotkey_.registerDefault(window_);
 
     if (!tray_.create(window_, instance, hotkey_.activeHotkeyLabel())) {
         MessageBoxW(nullptr, L"Failed to create Dictator-md tray icon.", L"Dictator-md", MB_ICONERROR);
         hotkey_.unregister(window_);
         return 1;
-    }
-
-    if (!hotkeyRegistered) {
-        MessageBoxW(nullptr, L"Failed to register Right Alt, F8, and Ctrl+Alt+Space hotkeys.", L"Dictator-md", MB_ICONWARNING);
-    } else if (hotkey_.usedFallback()) {
-        const std::wstring message = std::wstring(L"Right Alt is unavailable on this Windows keyboard layout, so Dictator-md registered ") +
-            hotkey_.activeHotkeyLabel() + L" instead.";
-        MessageBoxW(nullptr, message.c_str(), L"Dictator-md", MB_ICONINFORMATION);
     }
 
     MSG message;
