@@ -19,6 +19,7 @@ private:
     bool createMessageWindow(HINSTANCE instance);
     void onHotkey();
     void onTrayCommand(UINT command);
+    void showStatus() const;
 
     HWND window_ = nullptr;
     HotkeyManager hotkey_;

@@ -90,6 +90,7 @@ jobs:
           2. Double-click Dictator-md.exe.
           3. Look for the Dictator-md tray icon.
           4. Press the registered hotkey to test insertion into the focused text box. Dictator-md tries Right Alt first, then silently falls back to F8, then Ctrl+Alt+Space.
+          5. If you do not see a window, check the tray overflow menu near the Windows clock. This preview is tray-first.
 
           Current limitation:
           This Windows preview validates tray, hotkey fallback, focus tracking, and text insertion.

@@ -21,6 +21,7 @@ bool TrayIcon::create(HWND window, HINSTANCE instance, const std::wstring& hotke
     const std::wstring testInsertLabel = hotkeyLabel.empty()
         ? std::wstring(L"Test insert")
         : std::wstring(L"Test insert (") + hotkeyLabel + L")";
+    AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_SHOW_STATUS, L"Show status");
     AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_TEST_INSERT, testInsertLabel.c_str());
     AppendMenuW(menu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_EXIT, L"Exit");

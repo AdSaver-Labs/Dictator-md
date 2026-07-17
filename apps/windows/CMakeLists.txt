@@ -10,6 +10,10 @@ if (NOT WIN32)
   message(FATAL_ERROR "The Windows prototype must be built on Windows.")
 endif()
 
+if (MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 add_executable(DictatorMDWindows WIN32
   src/App.cpp
   src/AudioCapture.cpp

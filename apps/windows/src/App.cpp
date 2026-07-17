@@ -75,12 +75,25 @@ void App::onTrayCommand(UINT command) {
     case IDM_DICTATOR_EXIT:
         PostQuitMessage(0);
         break;
+    case IDM_DICTATOR_SHOW_STATUS:
+        showStatus();
+        break;
     case IDM_DICTATOR_TEST_INSERT:
         onHotkey();
         break;
     default:
         break;
     }
+}
+
+void App::showStatus() const {
+    const std::wstring hotkeyLabel = hotkey_.activeHotkeyLabel().empty()
+        ? std::wstring(L"No global hotkey registered. Use the tray menu's Test insert action for now.")
+        : std::wstring(L"Active test hotkey: ") + hotkey_.activeHotkeyLabel();
+    const std::wstring message = std::wstring(L"Dictator-md Windows preview is running.\n\n") +
+        hotkeyLabel +
+        L"\n\nThis preview validates launch, tray, hotkey, focus tracking, and placeholder text insertion. Real microphone dictation is still being ported.";
+    MessageBoxW(window_, message.c_str(), L"Dictator-md", MB_ICONINFORMATION);
 }
 
 LRESULT CALLBACK App::WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
