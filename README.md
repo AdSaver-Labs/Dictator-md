@@ -43,7 +43,7 @@ Use `Dictator-md.dmg` for macOS and `Dictator-md-windows-preview.zip` for the cu
 
 **Windows support is currently a developer prototype, not a finished dictation app.**
 
-The working product today is the macOS app. The Windows scaffold exists so contributors/testers can validate native Windows pieces such as the tray app, global hotkey, active-window detection, and text insertion. It does **not yet** record microphone audio or run Whisper transcription on Windows. Pressing the prototype hotkey currently inserts a placeholder sentence.
+The working product today is the macOS app. The Windows scaffold exists so contributors/testers can validate native Windows pieces such as the visible app window, tray app, global hotkey, active-window detection, and text insertion. It does **not yet** record microphone audio or run Whisper transcription on Windows. Pressing the manually selected prototype hotkey currently inserts a placeholder sentence.
 
 For Windows prototype build and manual testing steps, see:
 
@@ -116,7 +116,7 @@ Dictator-md checks GitHub Releases for newer versions. When an update is availab
 
 Download `Dictator-md-windows-preview.zip` from [Releases](https://github.com/AdSaver-Labs/Dictator-md/releases), extract it, and run `Dictator-md.exe`.
 
-The Windows build is currently a preview: tray app, manual hotkey registration, focused-window tracking, and text insertion are wired. Real microphone capture and local Whisper transcription are still being ported, so the Windows build is not yet equivalent to the macOS dictation app. It opens first, then the tester chooses Right Alt, F8, or Ctrl+Alt+Space from the tray menu.
+The Windows build is currently a preview: visible app window, tray app, manual hotkey registration, focused-window tracking, and text insertion are wired. Real microphone capture and local Whisper transcription are still being ported, so the Windows build is not yet equivalent to the macOS dictation app. It opens first, then the tester chooses Right Alt, F8, or Ctrl+Alt+Space from the app window or tray menu.
 
 Or build from source:
 

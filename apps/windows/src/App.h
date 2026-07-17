@@ -16,13 +16,24 @@ public:
 private:
     static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
-    bool createMessageWindow(HINSTANCE instance);
+    bool createMainWindow(HINSTANCE instance, int showCommand);
+    void createChildControls();
+    void layoutControls(int width, int height);
     void onHotkey();
     void onTrayCommand(UINT command);
-    void showStatus() const;
+    void showStatus();
     void configureHotkey(UINT command);
+    void refreshStatusText();
 
     HWND window_ = nullptr;
+    HWND statusLabel_ = nullptr;
+    HWND infoLabel_ = nullptr;
+    HWND rightAltButton_ = nullptr;
+    HWND f8Button_ = nullptr;
+    HWND ctrlAltSpaceButton_ = nullptr;
+    HWND clearButton_ = nullptr;
+    HWND testButton_ = nullptr;
+    HWND exitButton_ = nullptr;
     HotkeyManager hotkey_;
     TrayIcon tray_;
     FocusTracker focusTracker_;

@@ -66,9 +66,19 @@ jobs:
         shell: pwsh
         run: |
           $process = Start-Process -FilePath build/windows/Dictator-md.exe -PassThru
-          Start-Sleep -Seconds 5
+          for ($attempt = 0; $attempt -lt 10; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            $process.Refresh()
+            if ($process.HasExited -or $process.MainWindowHandle -ne 0) {
+              break
+            }
+          }
           if ($process.HasExited) {
             throw "Dictator-md.exe exited during launch smoke test with code $($process.ExitCode)."
+          }
+          if ($process.MainWindowHandle -eq 0) {
+            Stop-Process -Id $process.Id -Force
+            throw "Dictator-md.exe launched but did not create a visible main window."
           }
           Stop-Process -Id $process.Id -Force
 

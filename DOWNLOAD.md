@@ -38,13 +38,14 @@ The Windows app is currently a preview, not the full dictation product yet.
 3. Extract the zip.
 4. Run `Dictator-md.exe`.
 
-If nothing appears, check the Windows tray overflow menu near the clock. The current Windows preview is a tray app and does not open a full settings window yet.
+The Windows preview opens a normal app window first. If you do not see it, check the taskbar and the Windows tray overflow menu near the clock.
 
 Current Windows preview behavior:
 
 - Tray app launches.
+- A visible app window opens on launch.
 - No hotkey is registered during launch.
-- The tray menu lets you manually choose Right Alt, F8, or Ctrl+Alt+Space after the app is already running.
+- The app window and tray menu let you manually choose Right Alt, F8, or Ctrl+Alt+Space after the app is already running.
 - Focused-window tracking is wired.
 - Text insertion path is wired.
 - It inserts a placeholder test sentence.

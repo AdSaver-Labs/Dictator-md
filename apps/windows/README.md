@@ -16,7 +16,7 @@ The Windows shell is intentionally native because these parts need system-level 
 
 Implemented:
 
-- hidden Win32 message window
+- visible Win32 app window
 - tray icon
 - global hotkey registration
 - foreground-window capture
@@ -51,9 +51,9 @@ Extract the zip and run:
 .\Dictator-md.exe
 ```
 
-The Windows preview currently validates the native tray app, manual hotkey registration, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
+The Windows preview currently validates the native app window, tray app, manual hotkey registration, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
 
-If the app looks like it did not open, check the Windows tray overflow menu near the clock. The preview is tray-first and does not open a full settings window yet.
+The app opens a visible window first. If the window is hidden, check the Windows taskbar and tray overflow menu near the clock.
 
 ## Build On Windows From Source
 
@@ -86,7 +86,7 @@ Run:
 
 ## Preview Behavior
 
-The app does not register a hotkey during launch. Open the tray menu first, then choose **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey**. If Windows refuses one option, pick another. Until audio and Whisper are wired, the hotkey inserts a placeholder sentence into the current focused application:
+The app does not register a hotkey during launch. Open the app first, then choose **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey** from the visible window or tray menu. If Windows refuses one option, pick another. Until audio and Whisper are wired, the hotkey inserts a placeholder sentence into the current focused application:
 
 ```text
 Dictator-md Windows insertion test.

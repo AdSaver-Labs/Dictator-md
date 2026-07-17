@@ -112,7 +112,7 @@ Fail if:
 
 ### 2. Placeholder insertion
 
-Open Notepad, click into the empty document, then right-click the Dictator-md tray icon and choose one of the hotkey options: **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey**. Press the chosen hotkey.
+Open Notepad, click into the empty document, then use the visible Dictator-md window or tray menu to choose one of the hotkey options: **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey**. Press the chosen hotkey.
 
 Pass if placeholder text appears:
 

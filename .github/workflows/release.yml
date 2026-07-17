@@ -88,13 +88,13 @@ jobs:
           How to run:
           1. Extract this zip.
           2. Double-click Dictator-md.exe.
-          3. Look for the Dictator-md tray icon.
-          4. Right-click the tray icon and choose a hotkey manually: Right Alt, F8, or Ctrl+Alt+Space.
+          3. The Dictator-md window should open.
+          4. Choose a hotkey manually in the app window or tray menu: Right Alt, F8, or Ctrl+Alt+Space.
           5. Press the chosen hotkey to test insertion into the focused text box.
-          6. If you do not see a window, check the tray overflow menu near the Windows clock. This preview is tray-first.
+          6. If you do not see a window, check the Windows taskbar and tray overflow menu near the clock.
 
           Current limitation:
-          This Windows preview validates tray, manual hotkey setup, focus tracking, and text insertion.
+          This Windows preview validates visible launch, tray, manual hotkey setup, focus tracking, and text insertion.
           Real microphone capture + local Whisper transcription are still being ported.
           "@ | Set-Content -Encoding UTF8 build/windows-package/START-HERE.txt
           Compress-Archive -Path build/windows-package/* -DestinationPath build/Dictator-md-windows-preview.zip -Force
@@ -113,4 +113,4 @@ jobs:
             ### Windows preview
             This release includes `Dictator-md-windows-preview.zip`.
 
-            The Windows build currently validates the native tray app, manual hotkey setup, focused-window tracking, and text insertion path. Full microphone capture and local Whisper transcription are still being ported.
+            The Windows build currently validates visible launch, native tray support, manual hotkey setup, focused-window tracking, and text insertion path. Full microphone capture and local Whisper transcription are still being ported.
