@@ -20,6 +20,7 @@ private:
     void onHotkey();
     void onTrayCommand(UINT command);
     void showStatus() const;
+    void configureHotkey(UINT command);
 
     HWND window_ = nullptr;
     HotkeyManager hotkey_;

@@ -13,11 +13,8 @@ int App::run(HINSTANCE instance, int showCommand) {
         return 1;
     }
 
-    hotkey_.registerDefault(window_);
-
     if (!tray_.create(window_, instance, hotkey_.activeHotkeyLabel())) {
         MessageBoxW(nullptr, L"Failed to create Dictator-md tray icon.", L"Dictator-md", MB_ICONERROR);
-        hotkey_.unregister(window_);
         return 1;
     }
 
@@ -78,6 +75,12 @@ void App::onTrayCommand(UINT command) {
     case IDM_DICTATOR_SHOW_STATUS:
         showStatus();
         break;
+    case IDM_DICTATOR_SET_RIGHT_ALT:
+    case IDM_DICTATOR_SET_F8:
+    case IDM_DICTATOR_SET_CTRL_ALT_SPACE:
+    case IDM_DICTATOR_CLEAR_HOTKEY:
+        configureHotkey(command);
+        break;
     case IDM_DICTATOR_TEST_INSERT:
         onHotkey();
         break;
@@ -88,12 +91,42 @@ void App::onTrayCommand(UINT command) {
 
 void App::showStatus() const {
     const std::wstring hotkeyLabel = hotkey_.activeHotkeyLabel().empty()
-        ? std::wstring(L"No global hotkey registered. Use the tray menu's Test insert action for now.")
+        ? std::wstring(L"No global hotkey registered yet. Choose a hotkey from this tray menu when you are ready.")
         : std::wstring(L"Active test hotkey: ") + hotkey_.activeHotkeyLabel();
     const std::wstring message = std::wstring(L"Dictator-md Windows preview is running.\n\n") +
         hotkeyLabel +
         L"\n\nThis preview validates launch, tray, hotkey, focus tracking, and placeholder text insertion. Real microphone dictation is still being ported.";
     MessageBoxW(window_, message.c_str(), L"Dictator-md", MB_ICONINFORMATION);
+}
+
+void App::configureHotkey(UINT command) {
+    if (command == IDM_DICTATOR_CLEAR_HOTKEY) {
+        hotkey_.unregister(window_);
+        MessageBoxW(window_, L"Global hotkey cleared. The app is still running in the tray.", L"Dictator-md", MB_ICONINFORMATION);
+        return;
+    }
+
+    bool registered = false;
+    switch (command) {
+    case IDM_DICTATOR_SET_RIGHT_ALT:
+        registered = hotkey_.registerRightAlt(window_);
+        break;
+    case IDM_DICTATOR_SET_F8:
+        registered = hotkey_.registerF8(window_);
+        break;
+    case IDM_DICTATOR_SET_CTRL_ALT_SPACE:
+        registered = hotkey_.registerCtrlAltSpace(window_);
+        break;
+    default:
+        return;
+    }
+
+    if (registered) {
+        const std::wstring message = std::wstring(L"Registered hotkey: ") + hotkey_.activeHotkeyLabel();
+        MessageBoxW(window_, message.c_str(), L"Dictator-md", MB_ICONINFORMATION);
+    } else {
+        MessageBoxW(window_, L"Windows refused that hotkey. Pick another option from the tray menu.", L"Dictator-md", MB_ICONWARNING);
+    }
 }
 
 LRESULT CALLBACK App::WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {

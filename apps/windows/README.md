@@ -51,7 +51,7 @@ Extract the zip and run:
 .\Dictator-md.exe
 ```
 
-The Windows preview currently validates the native tray app, hotkey registration, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
+The Windows preview currently validates the native tray app, manual hotkey registration, focused-window tracking, and text insertion path. It does **not** yet perform real voice transcription.
 
 If the app looks like it did not open, check the Windows tray overflow menu near the clock. The preview is tray-first and does not open a full settings window yet.
 
@@ -86,7 +86,7 @@ Run:
 
 ## Preview Behavior
 
-Press the registered hotkey to trigger the pipeline. Dictator-md first tries `Right Alt`, then silently falls back to `F8`, then `Ctrl+Alt+Space` if Windows refuses the earlier options. The app still opens even when a preferred hotkey is unavailable; open the tray menu and choose **Show status** to see the active test hotkey. Until audio and Whisper are wired, it inserts a placeholder sentence into the current focused application:
+The app does not register a hotkey during launch. Open the tray menu first, then choose **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey**. If Windows refuses one option, pick another. Until audio and Whisper are wired, the hotkey inserts a placeholder sentence into the current focused application:
 
 ```text
 Dictator-md Windows insertion test.

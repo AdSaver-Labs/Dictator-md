@@ -10,7 +10,7 @@ What works today:
 
 - Native Win32 app launches.
 - Tray icon/menu is created.
-- Global hotkey registration is wired, with silent fallback shortcuts if Right Alt is unavailable on the tester's keyboard layout.
+- Global hotkey registration is wired, but hotkeys are selected manually from the tray after launch.
 - The app can detect the foreground window.
 - The app can paste text into the focused application using clipboard + `SendInput`.
 - Pressing the prototype hotkey inserts a placeholder sentence.
@@ -112,7 +112,7 @@ Fail if:
 
 ### 2. Placeholder insertion
 
-Open Notepad, click into the empty document, then press the registered hotkey. Dictator-md first tries **Right Alt**, then **F8**, then **Ctrl+Alt+Space**. The app should still launch normally if one of those shortcuts is unavailable.
+Open Notepad, click into the empty document, then right-click the Dictator-md tray icon and choose one of the hotkey options: **Use Right Alt hotkey**, **Use F8 hotkey**, or **Use Ctrl+Alt+Space hotkey**. Press the chosen hotkey.
 
 Pass if placeholder text appears:
 

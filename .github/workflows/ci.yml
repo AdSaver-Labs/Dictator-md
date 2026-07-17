@@ -53,6 +53,25 @@ jobs:
       - name: Build Windows prototype
         run: cmake --build build/windows
 
+      - name: Verify Windows runtime dependencies
+        shell: pwsh
+        run: |
+          $deps = & dumpbin /dependents build/windows/Dictator-md.exe
+          $deps | Out-String | Write-Host
+          if ($deps -match "VCRUNTIME|MSVCP") {
+            throw "Windows executable depends on Visual C++ runtime DLLs. The preview should launch on tester machines without extra runtime installs."
+          }
+
+      - name: Smoke test Windows executable launches
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath build/windows/Dictator-md.exe -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) {
+            throw "Dictator-md.exe exited during launch smoke test with code $($process.ExitCode)."
+          }
+          Stop-Process -Id $process.Id -Force
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:

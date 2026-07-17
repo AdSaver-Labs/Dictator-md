@@ -22,6 +22,12 @@ bool TrayIcon::create(HWND window, HINSTANCE instance, const std::wstring& hotke
         ? std::wstring(L"Test insert")
         : std::wstring(L"Test insert (") + hotkeyLabel + L")";
     AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_SHOW_STATUS, L"Show status");
+    AppendMenuW(menu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_SET_RIGHT_ALT, L"Use Right Alt hotkey");
+    AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_SET_F8, L"Use F8 hotkey");
+    AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_SET_CTRL_ALT_SPACE, L"Use Ctrl+Alt+Space hotkey");
+    AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_CLEAR_HOTKEY, L"Clear hotkey");
+    AppendMenuW(menu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_TEST_INSERT, testInsertLabel.c_str());
     AppendMenuW(menu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu_, MF_STRING, IDM_DICTATOR_EXIT, L"Exit");

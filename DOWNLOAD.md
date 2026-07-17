@@ -43,7 +43,8 @@ If nothing appears, check the Windows tray overflow menu near the clock. The cur
 Current Windows preview behavior:
 
 - Tray app launches.
-- Right Alt is tried first, with F8 and Ctrl+Alt+Space as silent automatic fallbacks if Windows refuses it.
+- No hotkey is registered during launch.
+- The tray menu lets you manually choose Right Alt, F8, or Ctrl+Alt+Space after the app is already running.
 - Focused-window tracking is wired.
 - Text insertion path is wired.
 - It inserts a placeholder test sentence.
