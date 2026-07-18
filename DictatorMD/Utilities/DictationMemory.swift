@@ -13,6 +13,50 @@ struct DictationHistoryItem: Identifiable, Codable, Equatable {
     let cleanupCutCount: Int?
 }
 
+struct DictationStatsEntry: Identifiable, Codable, Equatable {
+    let id: UUID
+    let timestamp: Date
+    let language: String
+    let appName: String
+    let bundleIdentifier: String
+    let audioDuration: Double
+    let wordCount: Int
+    let cleanupCutCount: Int?
+
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        language: String,
+        appName: String,
+        bundleIdentifier: String,
+        audioDuration: Double,
+        wordCount: Int,
+        cleanupCutCount: Int?
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.language = language
+        self.appName = appName
+        self.bundleIdentifier = bundleIdentifier
+        self.audioDuration = audioDuration
+        self.wordCount = wordCount
+        self.cleanupCutCount = cleanupCutCount
+    }
+
+    init(historyItem: DictationHistoryItem) {
+        self.init(
+            id: historyItem.id,
+            timestamp: historyItem.timestamp,
+            language: historyItem.language,
+            appName: historyItem.appName,
+            bundleIdentifier: historyItem.bundleIdentifier,
+            audioDuration: historyItem.audioDuration,
+            wordCount: historyItem.wordCount,
+            cleanupCutCount: historyItem.cleanupCutCount
+        )
+    }
+}
+
 struct LearnedTerm: Identifiable, Codable, Equatable {
     var id: String { term.lowercased() }
     let term: String
@@ -25,6 +69,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
     static nonisolated(unsafe) let shared = DictationMemory()
 
     @Published private(set) var history: [DictationHistoryItem] = []
+    @Published private(set) var statsEntries: [DictationStatsEntry] = []
     @Published private(set) var learnedTerms: [LearnedTerm] = []
 
     private let fileURL: URL
@@ -33,6 +78,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
 
     private struct Store: Codable {
         var history: [DictationHistoryItem]
+        var statsEntries: [DictationStatsEntry]?
         var learnedTerms: [LearnedTerm]
     }
 
@@ -56,12 +102,15 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             wordCount: Self.wordCount(in: trimmed),
             cleanupCutCount: cleanupCutCount
         )
+        let statsEntry = DictationStatsEntry(historyItem: item)
 
         let candidates = Self.extractCandidateTerms(from: trimmed)
         DispatchQueue.main.async {
             var newHistory = self.history
+            var newStatsEntries = self.statsEntries
             var newTerms = self.learnedTerms
             newHistory.insert(item, at: 0)
+            newStatsEntries.insert(statsEntry, at: 0)
             if newHistory.count > self.maxHistoryItems {
                 newHistory.removeLast(newHistory.count - self.maxHistoryItems)
             }
@@ -88,8 +137,9 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             }
 
             self.history = newHistory
+            self.statsEntries = newStatsEntries
             self.learnedTerms = newTerms
-            self.save(Store(history: newHistory, learnedTerms: newTerms))
+            self.save(Store(history: newHistory, statsEntries: newStatsEntries, learnedTerms: newTerms))
             DebugLog.shared.log("[DictationMemory] recorded words=\(item.wordCount) candidates=\(candidates.count) learned=\(newTerms.count)")
         }
     }
@@ -117,19 +167,20 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
     func removeLearnedTerm(_ term: String) {
         let newTerms = learnedTerms.filter { $0.term != term }
         learnedTerms = newTerms
-        let store = Store(history: history, learnedTerms: newTerms)
+        let store = Store(history: history, statsEntries: statsEntries, learnedTerms: newTerms)
         save(store)
     }
 
     func clearHistory() {
         history = []
-        let store = Store(history: [], learnedTerms: learnedTerms)
+        statsEntries = []
+        let store = Store(history: [], statsEntries: [], learnedTerms: learnedTerms)
         save(store)
     }
 
     func clearLearnedTerms() {
         learnedTerms = []
-        let store = Store(history: history, learnedTerms: [])
+        let store = Store(history: history, statsEntries: statsEntries, learnedTerms: [])
         save(store)
     }
 
@@ -139,6 +190,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             return
         }
         history = store.history
+        statsEntries = store.statsEntries ?? store.history.map(DictationStatsEntry.init(historyItem:))
         learnedTerms = store.learnedTerms
     }
 

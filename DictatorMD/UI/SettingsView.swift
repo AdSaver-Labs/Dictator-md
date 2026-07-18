@@ -625,7 +625,7 @@ private struct DashboardSection: View {
         if availableWidth >= 1040 {
             HStack(alignment: .top, spacing: 12) {
                 ConceptWeeklyActivityCard(
-                    history: memory.history,
+                    statsEntries: memory.statsEntries,
                     colorScheme: colorScheme,
                     availableRanges: ActivityRange.dashboardRanges,
                     selectedRange: $selectedActivityRange
@@ -646,7 +646,7 @@ private struct DashboardSection: View {
         } else if availableWidth >= 620 {
             VStack(spacing: 12) {
                 ConceptWeeklyActivityCard(
-                    history: memory.history,
+                    statsEntries: memory.statsEntries,
                     colorScheme: colorScheme,
                     availableRanges: ActivityRange.dashboardRanges,
                     selectedRange: $selectedActivityRange
@@ -666,7 +666,7 @@ private struct DashboardSection: View {
         } else {
             VStack(spacing: 12) {
                 ConceptWeeklyActivityCard(
-                    history: memory.history,
+                    statsEntries: memory.statsEntries,
                     colorScheme: colorScheme,
                     availableRanges: ActivityRange.dashboardRanges,
                     selectedRange: $selectedActivityRange
@@ -714,8 +714,8 @@ private struct DashboardSection: View {
         selectedActivityRange.dateInterval(calendar: calendar)
     }
 
-    private var selectedItems: [DictationHistoryItem] {
-        memory.history.filter { selectedInterval.contains($0.timestamp) }
+    private var selectedItems: [DictationStatsEntry] {
+        memory.statsEntries.filter { selectedInterval.contains($0.timestamp) }
     }
 
     private var selectedLearnedTerms: Int {
@@ -739,7 +739,7 @@ private struct DashboardSection: View {
     private var weeklyBuckets: [DailyWordBucket] {
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? calendar.startOfDay(for: Date())
         let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? Date()
-        return dailyBuckets(startingAt: weekStart, endingAt: weekEnd, calendar: calendar, history: memory.history)
+        return dailyBuckets(startingAt: weekStart, endingAt: weekEnd, calendar: calendar, statsEntries: memory.statsEntries)
     }
 
     private var weeklyDictations: Int {
@@ -1120,7 +1120,7 @@ private enum ActivityRange: String, CaseIterable, Identifiable {
 }
 
 private struct ConceptWeeklyActivityCard: View {
-    let history: [DictationHistoryItem]
+    let statsEntries: [DictationStatsEntry]
     let colorScheme: ColorScheme
     let availableRanges: [ActivityRange]
     @Binding var selectedRange: ActivityRange
@@ -1131,19 +1131,19 @@ private struct ConceptWeeklyActivityCard: View {
         switch selectedRange {
         case .today:
             let today = calendar.startOfDay(for: Date())
-            return dailyBuckets(startingAt: today, endingAt: today, calendar: calendar, history: history)
+            return dailyBuckets(startingAt: today, endingAt: today, calendar: calendar, statsEntries: statsEntries)
         case .thisWeek:
             let start = mondayStart(for: Date())
             let end = calendar.date(byAdding: .day, value: 6, to: start) ?? Date()
-            return dailyBuckets(startingAt: start, endingAt: end, calendar: calendar, history: history)
+            return dailyBuckets(startingAt: start, endingAt: end, calendar: calendar, statsEntries: statsEntries)
         case .lastSevenDays:
             let today = calendar.startOfDay(for: Date())
             let start = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-            return dailyBuckets(startingAt: start, endingAt: today, calendar: calendar, history: history)
+            return dailyBuckets(startingAt: start, endingAt: today, calendar: calendar, statsEntries: statsEntries)
         case .thisMonth:
             guard let interval = calendar.dateInterval(of: .month, for: Date()) else { return [] }
             let end = calendar.date(byAdding: .day, value: -1, to: interval.end) ?? Date()
-            return dailyBuckets(startingAt: interval.start, endingAt: end, calendar: calendar, history: history)
+            return dailyBuckets(startingAt: interval.start, endingAt: end, calendar: calendar, statsEntries: statsEntries)
         case .thisYear, .allTime:
             return []
         }
@@ -1154,7 +1154,7 @@ private struct ConceptWeeklyActivityCard: View {
     }
 
     private var monthWeeks: [[DailyWordBucket]] {
-        monthWeekBuckets(containing: Date(), calendar: calendar, history: history)
+        monthWeekBuckets(containing: Date(), calendar: calendar, statsEntries: statsEntries)
     }
 
     var body: some View {
@@ -1268,11 +1268,11 @@ private struct ConceptWeeklyActivityCard: View {
 
     private var yearMonths: [MonthlyActivityBucket] {
         guard let interval = calendar.dateInterval(of: .year, for: Date()) else { return [] }
-        return monthlyActivityBuckets(calendar: calendar, history: history).filter { interval.contains($0.month) }
+        return monthlyActivityBuckets(calendar: calendar, statsEntries: statsEntries).filter { interval.contains($0.month) }
     }
 
     private var allTimeMonths: [MonthlyActivityBucket] {
-        monthlyActivityBuckets(calendar: calendar, history: history)
+        monthlyActivityBuckets(calendar: calendar, statsEntries: statsEntries)
     }
 
     private func dayColumn(_ day: DailyWordBucket) -> some View {
@@ -1853,9 +1853,9 @@ private struct MonthlyActivityBucket: Identifiable {
 
 private func monthlyActivityBuckets(
     calendar: Calendar,
-    history: [DictationHistoryItem]
+    statsEntries: [DictationStatsEntry]
 ) -> [MonthlyActivityBucket] {
-    let grouped = Dictionary(grouping: history) { item in
+    let grouped = Dictionary(grouping: statsEntries) { item in
         calendar.dateInterval(of: .month, for: item.timestamp)?.start
             ?? calendar.startOfDay(for: item.timestamp)
     }
@@ -1875,7 +1875,7 @@ private func dailyBuckets(
     startingAt start: Date,
     endingAt end: Date,
     calendar: Calendar,
-    history: [DictationHistoryItem]
+    statsEntries: [DictationStatsEntry]
 ) -> [DailyWordBucket] {
     let startDay = calendar.startOfDay(for: start)
     let endDay = calendar.startOfDay(for: end)
@@ -1885,7 +1885,7 @@ private func dailyBuckets(
     var day = startDay
     while day <= endDay {
         let nextDay = calendar.date(byAdding: .day, value: 1, to: day) ?? day
-        let items = history.filter { $0.timestamp >= day && $0.timestamp < nextDay }
+        let items = statsEntries.filter { $0.timestamp >= day && $0.timestamp < nextDay }
         buckets.append(
             DailyWordBucket(
                 date: day,
@@ -1902,7 +1902,7 @@ private func dailyBuckets(
 private func monthWeekBuckets(
     containing date: Date,
     calendar: Calendar,
-    history: [DictationHistoryItem]
+    statsEntries: [DictationStatsEntry]
 ) -> [[DailyWordBucket]] {
     guard let monthInterval = calendar.dateInterval(of: .month, for: date) else { return [] }
     let monthStart = monthInterval.start
@@ -1914,7 +1914,7 @@ private func monthWeekBuckets(
     var weekStart = firstWeekStart
     while weekStart <= lastWeekStart {
         let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
-        weeks.append(dailyBuckets(startingAt: weekStart, endingAt: weekEnd, calendar: calendar, history: history))
+        weeks.append(dailyBuckets(startingAt: weekStart, endingAt: weekEnd, calendar: calendar, statsEntries: statsEntries))
         guard let nextWeek = calendar.date(byAdding: .day, value: 7, to: weekStart), nextWeek > weekStart else { break }
         weekStart = nextWeek
     }
@@ -1922,13 +1922,13 @@ private func monthWeekBuckets(
 }
 
 private struct WeeklyWordBars: View {
-    let history: [DictationHistoryItem]
+    let statsEntries: [DictationStatsEntry]
     let colorScheme: ColorScheme
     @Binding var selectedRange: ActivityRange
 
     var body: some View {
         ConceptWeeklyActivityCard(
-            history: history,
+            statsEntries: statsEntries,
             colorScheme: colorScheme,
             availableRanges: ActivityRange.historyRanges,
             selectedRange: $selectedRange
@@ -2749,7 +2749,7 @@ private struct HistorySection: View {
                     .controlSize(.small)
                 }
 
-                if memory.history.isEmpty {
+                if memory.statsEntries.isEmpty {
                     EmptyStateLine(icon: "chart.bar.xaxis", text: "Daily activity appears here once you have dictation history.")
                 } else {
                     VStack(alignment: .leading, spacing: 14) {
@@ -2775,7 +2775,7 @@ private struct HistorySection: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         } else {
                             WeeklyWordBars(
-                                history: memory.history,
+                                statsEntries: memory.statsEntries,
                                 colorScheme: colorScheme,
                                 selectedRange: $selectedActivityRange
                             )
@@ -2854,8 +2854,8 @@ private struct HistorySection: View {
         selectedActivityRange.dateInterval(calendar: calendar)
     }
 
-    private var selectedHistory: [DictationHistoryItem] {
-        memory.history.filter { selectedInterval.contains($0.timestamp) }
+    private var selectedHistory: [DictationStatsEntry] {
+        memory.statsEntries.filter { selectedInterval.contains($0.timestamp) }
     }
 
     private var selectedLearnedTerms: Int {
@@ -2900,14 +2900,14 @@ private struct HistorySection: View {
             startingAt: weekStart,
             endingAt: weekEnd,
             calendar: calendar,
-            history: memory.history
+            statsEntries: memory.statsEntries
         )
     }
 
     private var selectedActivityBuckets: [DailyWordBucket] {
         if selectedActivityRange == .allTime || selectedActivityRange == .thisYear {
             let interval = selectedActivityRange.dateInterval(calendar: calendar)
-            return monthlyActivityBuckets(calendar: calendar, history: memory.history).filter { month in
+            return monthlyActivityBuckets(calendar: calendar, statsEntries: memory.statsEntries).filter { month in
                 interval.contains(month.month)
             }.map { month in
                 DailyWordBucket(
@@ -2925,12 +2925,12 @@ private struct HistorySection: View {
             startingAt: interval.start,
             endingAt: end,
             calendar: calendar,
-            history: memory.history
+            statsEntries: memory.statsEntries
         )
     }
 
     private var selectedMonthWeeks: [[DailyWordBucket]] {
-        monthWeekBuckets(containing: selectedActivityMonth, calendar: calendar, history: memory.history)
+        monthWeekBuckets(containing: selectedActivityMonth, calendar: calendar, statsEntries: memory.statsEntries)
     }
 
     private var monthBuckets: [DailyWordBucket] {
