@@ -142,7 +142,10 @@ private func verifySidebarVisible(in window: AXUIElement, width: Int, height: In
         ])
     }
 
-    let windowFrame = CGRect(origin: windowPosition, size: windowSize).insetBy(dx: -1, dy: -1)
+    // AX child frames are measured against the content view while the window frame
+    // includes a native title-bar/shadow boundary. Permit that narrow edge
+    // difference while still rejecting genuinely clipped sidebar controls.
+    let windowFrame = CGRect(origin: windowPosition, size: windowSize).insetBy(dx: -10, dy: -10)
     let navLabels = ["Open Dashboard", "Open History", "Open Vocabulary", "Open Models", "Open Control Center", "Open Settings"]
     let buttons = descendants(of: window).filter {
         stringAttribute(kAXRoleAttribute, of: $0) == kAXButtonRole

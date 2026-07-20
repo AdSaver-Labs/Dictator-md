@@ -37,7 +37,9 @@ final class TextCorrector: @unchecked Sendable {
         result = fixPunctuation(result)
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
-        print("[TextCorrector] \(String(format: "%.1f", elapsed))ms: \"\(text)\" → \"\(result)\"")
+        // Do not write dictated content to the console. Performance telemetry is
+        // useful for local diagnosis, while raw transcripts are private user data.
+        DebugLog.shared.log("[TextCorrector] elapsedMs=\(String(format: "%.1f", elapsed)) inputChars=\(text.count) outputChars=\(result.count)")
         return result
     }
 

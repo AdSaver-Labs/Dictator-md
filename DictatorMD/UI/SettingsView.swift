@@ -41,6 +41,7 @@ private extension AppSettings.AppearanceMode {
 
 struct SettingsView: View {
     static let minimumWindowSize = NSSize(width: 760, height: 540)
+    private static let sidebarContentMinimumHeight: CGFloat = 660
 
     let engine: DictationEngine
     @ObservedObject private var settings = AppSettings.shared
@@ -159,6 +160,8 @@ struct SettingsView: View {
                     .padding(.vertical, 1)
             }
         }
+        // On compact windows the first child cannot fit, so ViewThatFits chooses
+        // the scroll surface rather than clipping navigation or status controls.
         .frame(width: 220)
         .background(
             colorScheme == .dark
@@ -241,7 +244,11 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
-        .frame(width: 220)
+        .frame(
+            width: 220,
+            minHeight: Self.sidebarContentMinimumHeight,
+            alignment: .top
+        )
     }
 
     // MARK: - Detail Pane

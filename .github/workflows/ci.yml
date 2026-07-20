@@ -16,6 +16,64 @@ jobs:
       - name: Verify mobile scaffolds
         run: bash scripts/verify-mobile-scaffolds.sh
 
+      - name: Verify platform contracts
+        run: bash scripts/verify-platform-contracts.sh
+
+  ios-build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate and compile iOS app + keyboard extension
+        run: |
+          IOS_PROJECT_DIR="$(mktemp -d)"
+          xcodegen generate --spec project.yml --project "$IOS_PROJECT_DIR" --project-root "$GITHUB_WORKSPACE"
+          xcodebuild \
+            -project "$IOS_PROJECT_DIR/Dictator-md.xcodeproj" \
+            -scheme DictatorMDiOS \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle distribution
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/dictator-md-gradle
+          key: dictator-md-gradle-8.10.2
+
+      - name: Compile Android app + IME
+        run: |
+          GRADLE_ROOT="$HOME/.cache/dictator-md-gradle/gradle-8.10.2"
+          if [ ! -x "$GRADLE_ROOT/bin/gradle" ]; then
+            mkdir -p "$HOME/.cache/dictator-md-gradle"
+            curl --fail --location --retry 3 \
+              https://services.gradle.org/distributions/gradle-8.10.2-bin.zip \
+              --output /tmp/gradle-8.10.2-bin.zip
+            curl --fail --location --retry 3 \
+              https://services.gradle.org/distributions/gradle-8.10.2-bin.zip.sha256 \
+              --output /tmp/gradle-8.10.2-bin.zip.sha256
+            echo "$(cat /tmp/gradle-8.10.2-bin.zip.sha256)  /tmp/gradle-8.10.2-bin.zip" | sha256sum --check --status
+            unzip -q /tmp/gradle-8.10.2-bin.zip -d "$HOME/.cache/dictator-md-gradle"
+          fi
+          "$GRADLE_ROOT/bin/gradle" --no-daemon -p apps/android :app:assembleDebug
+
   macos:
     runs-on: macos-15
     steps:

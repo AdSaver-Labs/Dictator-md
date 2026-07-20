@@ -12,6 +12,7 @@ Before making changes, read:
 4. `docs/WINDOWS_PORT_EXECUTION.md` - Windows status and direction.
 5. `docs/WINDOWS_MANUAL_TESTING.md` - Windows tester checklist.
 6. `docs/mobile/MOBILE_EXECUTION_PLAN.md` - mobile platform strategy.
+7. `docs/PLATFORM_READINESS_BLUEPRINT.md` - current cross-platform audit and release gates.
 
 ## Project Purpose
 
@@ -202,6 +203,7 @@ Mobile scaffold verification:
 
 ```bash
 scripts/verify-mobile-scaffolds.sh
+scripts/verify-platform-contracts.sh
 ```
 
 ## Release Rules

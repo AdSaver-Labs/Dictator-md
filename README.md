@@ -65,6 +65,8 @@ The repo now contains:
 
 iOS cannot replace Apple's built-in dictation button globally. The iOS path is a main app plus keyboard extension. Android can get closer to the desktop promise through a custom IME keyboard.
 
+The current platform audit and execution order are maintained in [`docs/PLATFORM_READINESS_BLUEPRINT.md`](docs/PLATFORM_READINESS_BLUEPRINT.md). It distinguishes working functionality from Windows/mobile scaffolds and defines the release gates for each platform.
+
 **Why Dictator-md?**
 - Apple's built-in dictation sends audio to Apple servers and has limited accuracy for technical terms
 - Commercial tools like Willow Voice and WisprFlow cost $8-15/month
