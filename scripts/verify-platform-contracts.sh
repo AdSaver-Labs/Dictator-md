@@ -22,11 +22,18 @@ for file in "${required_files[@]}"; do
   [[ -f "$file" ]] || { echo "Missing platform contract: $file" >&2; exit 1; }
 done
 
-plutil -lint \
-  apps/ios/DictatorMDiOS/Info.plist \
-  apps/ios/DictatorMDKeyboard/Info.plist \
-  apps/ios/DictatorMDiOS/DictatorMDiOS.entitlements \
-  apps/ios/DictatorMDKeyboard/DictatorMDKeyboard.entitlements >/dev/null
+plist_files=(
+  apps/ios/DictatorMDiOS/Info.plist
+  apps/ios/DictatorMDKeyboard/Info.plist
+  apps/ios/DictatorMDiOS/DictatorMDiOS.entitlements
+  apps/ios/DictatorMDKeyboard/DictatorMDKeyboard.entitlements
+)
+
+if command -v plutil >/dev/null 2>&1; then
+  plutil -lint "${plist_files[@]}" >/dev/null
+else
+  ruby -r rexml/document -e 'ARGV.each { |path| REXML::Document.new(File.read(path)) }' "${plist_files[@]}"
+fi
 
 grep -q 'NSMicrophoneUsageDescription' apps/ios/DictatorMDiOS/Info.plist
 grep -q 'NSSpeechRecognitionUsageDescription' apps/ios/DictatorMDiOS/Info.plist

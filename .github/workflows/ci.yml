@@ -30,10 +30,9 @@ jobs:
 
       - name: Generate and compile iOS app + keyboard extension
         run: |
-          IOS_PROJECT_DIR="$(mktemp -d)"
-          xcodegen generate --spec project.yml --project "$IOS_PROJECT_DIR" --project-root "$GITHUB_WORKSPACE"
+          xcodegen generate --spec project.yml --project "$GITHUB_WORKSPACE" --project-root "$GITHUB_WORKSPACE"
           xcodebuild \
-            -project "$IOS_PROJECT_DIR/Dictator-md.xcodeproj" \
+            -project "$GITHUB_WORKSPACE/Dictator-md.xcodeproj" \
             -scheme DictatorMDiOS \
             -sdk iphonesimulator \
             -configuration Debug \

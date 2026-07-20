@@ -245,7 +245,9 @@ struct SettingsView: View {
             .padding(.bottom, 12)
         }
         .frame(
-            width: 220,
+            minWidth: 220,
+            idealWidth: 220,
+            maxWidth: 220,
             minHeight: Self.sidebarContentMinimumHeight,
             alignment: .top
         )
