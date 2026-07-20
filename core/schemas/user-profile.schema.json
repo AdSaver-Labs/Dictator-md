@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dictatormd.app/schemas/user-profile.schema.json",
+  "title": "Dictator-md User Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "languageMode",
+    "correction",
+    "customTerms",
+    "learnedTerms"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "languageMode": {
+      "type": "string",
+      "enum": ["auto", "en", "bg"]
+    },
+    "correction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grammar", "numbers", "intonation", "duplicateCollapse"],
+      "properties": {
+        "grammar": {
+          "type": "boolean"
+        },
+        "numbers": {
+          "type": "boolean"
+        },
+        "intonation": {
+          "type": "boolean"
+        },
+        "duplicateCollapse": {
+          "type": "boolean"
+        }
+      }
+    },
+    "customTerms": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "learnedTerms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/learnedTerm"
+      }
+    }
+  },
+  "$defs": {
+    "learnedTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["term", "language", "count", "lastSeen"],
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "enum": ["auto", "en", "bg"]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "firstSeen": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
+

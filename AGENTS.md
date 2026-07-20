@@ -11,6 +11,7 @@ Before making changes, read:
 3. `docs/UI_QUALITY_PROTOCOL.md` - UI verification rules.
 4. `docs/WINDOWS_PORT_EXECUTION.md` - Windows status and direction.
 5. `docs/WINDOWS_MANUAL_TESTING.md` - Windows tester checklist.
+6. `docs/mobile/MOBILE_EXECUTION_PLAN.md` - mobile platform strategy.
 
 ## Project Purpose
 
@@ -93,8 +94,8 @@ Windows is currently a preview, not the finished dictation product.
 
 Working:
 
-- Native Win32 tray app.
-- Right Alt hotkey.
+- Native Win32 app window and tray support.
+- Manual hotkey setup after launch.
 - Foreground/focused-window capture.
 - Clipboard plus `SendInput` insertion path.
 - GitHub Release zip artifact.
@@ -111,6 +112,20 @@ Release asset:
 - `Dictator-md-windows-preview.zip`
 
 Do not describe Windows as fully functional until microphone capture and local Whisper transcription are actually implemented and verified.
+
+### Mobile
+
+iOS and Android are scaffolds only.
+
+Current source:
+
+- `core/` shared schemas and portable language/correction/memory contracts.
+- `apps/ios/` main app plus keyboard extension scaffold.
+- `apps/android/` main app plus `InputMethodService` keyboard scaffold.
+
+Do not describe iOS or Android as downloadable or production-ready until real signed builds exist and have been tested on devices.
+
+iOS must respect Apple's platform limitations: Dictator-md cannot replace Apple's system dictation key globally. Android should use a custom IME for text-field insertion.
 
 ## Human Download Contract
 
@@ -182,6 +197,12 @@ make dashboard-resize-smoke
 ```
 
 Windows build is verified by GitHub Actions on `windows-latest`. Do not claim a Windows build passes unless the Windows CI/release job passed or a real Windows machine built it successfully.
+
+Mobile scaffold verification:
+
+```bash
+scripts/verify-mobile-scaffolds.sh
+```
 
 ## Release Rules
 

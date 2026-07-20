@@ -7,6 +7,15 @@ on:
     branches: [main]
 
 jobs:
+  mobile-scaffolds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify mobile scaffolds
+        run: bash scripts/verify-mobile-scaffolds.sh
+
   macos:
     runs-on: macos-15
     steps:

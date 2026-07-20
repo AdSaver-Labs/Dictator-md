@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dictatormd.app/schemas/dictation-event.schema.json",
+  "title": "Dictator-md Dictation Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "timestamp",
+    "platform",
+    "language",
+    "text",
+    "wordCount",
+    "audioDuration",
+    "cleanupCutCount"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["macos", "windows", "ios", "android"]
+    },
+    "language": {
+      "type": "string",
+      "enum": ["auto", "en", "bg"]
+    },
+    "text": {
+      "type": "string"
+    },
+    "targetApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bundleIdentifier"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bundleIdentifier": {
+          "type": "string"
+        }
+      }
+    },
+    "wordCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "audioDuration": {
+      "type": "number",
+      "minimum": 0
+    },
+    "cleanupCutCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "asrEngine": {
+      "type": "string"
+    },
+    "modelId": {
+      "type": "string"
+    }
+  }
+}
+

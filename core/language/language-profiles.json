@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "languages": [
+    {
+      "id": "en",
+      "label": "English",
+      "script": "latin",
+      "forceScript": true,
+      "blockedScripts": ["cyrillic"],
+      "punctuationStyle": "english"
+    },
+    {
+      "id": "bg",
+      "label": "Bulgarian",
+      "script": "cyrillic",
+      "forceScript": true,
+      "blockedScripts": ["latin-transliteration", "russian-only-cyrillic"],
+      "punctuationStyle": "bulgarian"
+    },
+    {
+      "id": "auto",
+      "label": "Auto",
+      "script": "mixed",
+      "forceScript": false,
+      "blockedScripts": ["russian-only-cyrillic"],
+      "punctuationStyle": "auto"
+    }
+  ]
+}
+

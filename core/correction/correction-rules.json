@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "collapse-duplicate-sentences",
+      "enabledByDefault": true,
+      "description": "Collapse repeated adjacent sentences created by ASR loops."
+    },
+    {
+      "id": "protect-custom-terms",
+      "enabledByDefault": true,
+      "description": "Keep user terms such as Openclaw, Hermes, and project names from being recased incorrectly."
+    },
+    {
+      "id": "english-script-guard",
+      "enabledByDefault": true,
+      "description": "Forced English mode must not output Cyrillic."
+    },
+    {
+      "id": "bulgarian-script-guard",
+      "enabledByDefault": true,
+      "description": "Forced Bulgarian mode should prefer Bulgarian Cyrillic output."
+    }
+  ]
+}
+

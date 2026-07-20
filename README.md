@@ -37,7 +37,7 @@ For direct download instructions, start here:
 - [`DOWNLOAD.md`](DOWNLOAD.md)
 - Latest GitHub Release: https://github.com/AdSaver-Labs/Dictator-md/releases/latest
 
-Use `Dictator-md.dmg` for macOS and `Dictator-md-windows-preview.zip` for the current Windows preview.
+Use `Dictator-md.dmg` for macOS and `Dictator-md-windows-preview.zip` for the current Windows preview. iOS and Android are source scaffolds only right now; there are no phone store downloads yet.
 
 ## Windows Status
 
@@ -51,6 +51,19 @@ For Windows prototype build and manual testing steps, see:
 - [`docs/WINDOWS_MANUAL_TESTING.md`](docs/WINDOWS_MANUAL_TESTING.md)
 
 Do not send normal end users to the Windows build yet. It is for technical feedback and porting work only.
+
+## Mobile Status
+
+**iOS and Android are scaffolds, not shippable mobile apps yet.**
+
+The repo now contains:
+
+- `core/` shared schemas, language profiles, correction rules, and memory protocol.
+- `apps/ios/` main iOS app plus keyboard extension scaffold.
+- `apps/android/` Android app plus `InputMethodService` keyboard scaffold.
+- `docs/mobile/MOBILE_EXECUTION_PLAN.md` for the platform plan.
+
+iOS cannot replace Apple's built-in dictation button globally. The iOS path is a main app plus keyboard extension. Android can get closer to the desktop promise through a custom IME keyboard.
 
 **Why Dictator-md?**
 - Apple's built-in dictation sends audio to Apple servers and has limited accuracy for technical terms

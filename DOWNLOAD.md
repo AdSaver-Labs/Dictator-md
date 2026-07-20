@@ -86,5 +86,7 @@ For Windows, see:
 | --- | --- |
 | macOS | `Dictator-md.dmg` |
 | Windows | `Dictator-md-windows-preview.zip` |
+| iOS | Not available yet |
+| Android | Not available yet |
 
 If you are not sure which file to download, use the table above.

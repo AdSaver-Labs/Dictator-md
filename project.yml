@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.dictatormd
   deploymentTarget:
     macOS: "14.0"
+    iOS: "17.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
 
@@ -77,3 +78,30 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: DictatorMD
+
+  DictatorMDiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: apps/ios/DictatorMDiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dictatormd.DictatorMDiOS
+        INFOPLIST_FILE: apps/ios/DictatorMDiOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: apps/ios/DictatorMDiOS/DictatorMDiOS.entitlements
+        SWIFT_VERSION: "5"
+    dependencies:
+      - target: DictatorMDKeyboard
+
+  DictatorMDKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: apps/ios/DictatorMDKeyboard
+      - path: apps/ios/DictatorMDiOS/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dictatormd.DictatorMDiOS.Keyboard
+        INFOPLIST_FILE: apps/ios/DictatorMDKeyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: apps/ios/DictatorMDKeyboard/DictatorMDKeyboard.entitlements
+        SWIFT_VERSION: "5"

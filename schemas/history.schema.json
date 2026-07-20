@@ -15,6 +15,13 @@
         "$ref": "#/$defs/historyItem"
       }
     },
+    "statsEntries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/statsEntry"
+      },
+      "default": []
+    },
     "learnedTerms": {
       "type": "array",
       "items": {
@@ -63,6 +70,50 @@
         },
         "wordCount": {
           "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "statsEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "timestamp",
+        "language",
+        "appName",
+        "bundleIdentifier",
+        "audioDuration",
+        "wordCount"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "language": {
+          "type": "string"
+        },
+        "appName": {
+          "type": "string"
+        },
+        "bundleIdentifier": {
+          "type": "string"
+        },
+        "audioDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wordCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cleanupCutCount": {
+          "type": ["integer", "null"],
           "minimum": 0
         }
       },
