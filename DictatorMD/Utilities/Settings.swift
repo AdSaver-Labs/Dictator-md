@@ -99,6 +99,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case grammarCorrectionEnabled
         case selectedAudioDeviceUID
         case numberConversionEnabled
+        case localProofreadingEnabled
         case customTerms
         case floatingNodeEnabled
         case appearanceMode
@@ -179,6 +180,11 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     var numberConversionEnabled: Bool {
         get { defaults.object(forKey: Key.numberConversionEnabled.rawValue) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.numberConversionEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var localProofreadingEnabled: Bool {
+        get { defaults.object(forKey: Key.localProofreadingEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.localProofreadingEnabled.rawValue); objectWillChange.send() }
     }
 
     var customTerms: [String] {

@@ -5,7 +5,7 @@ import ApplicationServices
 import Foundation
 
 private let bundleIdentifier = "com.dictatormd.DictatorMD"
-private let appURL = URL(fileURLWithPath: "/Applications/Dictator-md.app")
+private let appURL = URL(fileURLWithPath: ProcessInfo.processInfo.environment["DICTATORMD_APP_URL"] ?? "/Applications/Dictator-md.app")
 
 private func attribute(_ name: String, of element: AXUIElement) -> CFTypeRef? {
     var value: CFTypeRef?

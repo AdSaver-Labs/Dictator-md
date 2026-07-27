@@ -204,14 +204,11 @@ final class TextCorrectorTests: XCTestCase {
 
     // MARK: Number Conversion - Basic
 
-    func testNumberZero() {
+    func testSmallNumbersStayAsProse() {
         let result = corrector.correct("zero")
-        XCTAssertEqual(result, "0")
-    }
-
-    func testNumberSingleDigit() {
-        XCTAssertTrue(corrector.correct("one").contains("1"))
-        XCTAssertTrue(corrector.correct("nine").contains("9"))
+        XCTAssertEqual(result, "Zero.")
+        XCTAssertTrue(corrector.correct("I have two ideas").contains("two ideas"))
+        XCTAssertTrue(corrector.correct("nine reasons").contains("Nine reasons"))
     }
 
     func testNumberTeens() {
@@ -272,6 +269,12 @@ final class TextCorrectorTests: XCTestCase {
         let result = corrector.correct("I have three hundred dollars")
         XCTAssertTrue(result.contains("300"))
         XCTAssertTrue(result.contains("dollars"))
+    }
+
+    func testSmallNumbersUseDigitsInTechnicalOrMeasuredContexts() {
+        XCTAssertTrue(corrector.correct("version two").lowercased().contains("version 2"))
+        XCTAssertTrue(corrector.correct("five minutes").contains("5 minutes"))
+        XCTAssertTrue(corrector.correct("twelve people").contains("12 people"))
     }
 
     func testNumberPreservesNonNumberWords() {

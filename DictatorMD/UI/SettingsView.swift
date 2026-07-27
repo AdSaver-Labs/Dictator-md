@@ -2310,7 +2310,9 @@ private struct GeneralSection: View {
                     }
                 Toggle("Auto-correct grammar & formatting", isOn: $settings.grammarCorrectionEnabled)
                     .font(.system(size: 13))
-                Toggle("Convert number words to digits", isOn: $settings.numberConversionEnabled)
+                Toggle("Use smart number formatting", isOn: $settings.numberConversionEnabled)
+                    .font(.system(size: 13))
+                Toggle("Local spelling cleanup", isOn: $settings.localProofreadingEnabled)
                     .font(.system(size: 13))
                 Toggle("Sound feedback", isOn: $settings.soundFeedbackEnabled)
                     .font(.system(size: 13))

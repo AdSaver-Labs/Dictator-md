@@ -14,6 +14,7 @@ final class FloatingNodeController {
     private var hostingView: NSHostingView<FloatingNodeView>?
     private weak var engine: DictationEngine?
     var openSettingsAction: (() -> Void)?
+    private var presentation: FloatingNodePresentation = .collapsed
 
     private let collapsedIdlePanelSize = NSSize(width: 92, height: 5)
     private let collapsedWorkingPanelSize = NSSize(width: 74, height: 12)
@@ -41,7 +42,9 @@ final class FloatingNodeController {
                 defer: false
             )
             panel.isReleasedWhenClosed = false
-            panel.level = .statusBar
+            // Above normal/full-screen app windows, but below macOS security and
+            // system-critical surfaces such as the lock screen and screen saver.
+            panel.level = .popUpMenu
             panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
             panel.backgroundColor = .clear
             panel.isOpaque = false
@@ -74,6 +77,17 @@ final class FloatingNodeController {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(activeSpaceDidChange),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
     }
 
     func hide() {
@@ -83,10 +97,16 @@ final class FloatingNodeController {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
     }
 
     func setPresentation(_ presentation: FloatingNodePresentation, animated: Bool = true) {
         guard let panel else { return }
+        self.presentation = presentation
         let size: NSSize
         switch presentation {
         case .collapsed:
@@ -135,6 +155,13 @@ final class FloatingNodeController {
 
     @objc private func displayConfigurationDidChange() {
         setPresentation(.collapsed, animated: false)
+    }
+
+    @objc private func activeSpaceDidChange() {
+        guard panel?.isVisible == true else { return }
+        panel?.collectionBehavior.insert(.fullScreenAuxiliary)
+        setPresentation(presentation, animated: false)
+        panel?.orderFrontRegardless()
     }
 
     func openSettingsWindow() {

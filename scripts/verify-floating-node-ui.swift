@@ -4,6 +4,17 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+let sourceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("DictatorMD/UI/FloatingNodeView.swift")
+let source = try String(contentsOf: sourceURL, encoding: .utf8)
+guard source.contains("panel.level = .popUpMenu"),
+      source.contains(".fullScreenAuxiliary"),
+      source.contains("NSWorkspace.activeSpaceDidChangeNotification"),
+      source.contains("panel?.orderFrontRegardless()") else {
+    fputs("Floating node is not configured to stay over full-screen app spaces.\n", stderr)
+    exit(1)
+}
+
 let bundleIdentifier = "com.dictatormd.DictatorMD"
 let applications = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
 

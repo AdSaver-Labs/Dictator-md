@@ -26,6 +26,7 @@ SWIFT_FILES := \
 	DictatorMD/Engine/SoundFeedback.swift \
 	DictatorMD/Engine/ModelManager.swift \
 	DictatorMD/Engine/ProsodyAnalyzer.swift \
+	DictatorMD/Engine/LocalProofreader.swift \
 	DictatorMD/Engine/TextCorrector.swift \
 	DictatorMD/Utilities/HotkeyMonitor.swift \
 	DictatorMD/Utilities/PermissionManager.swift \
@@ -44,7 +45,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke
 
 all: whisper app
 
@@ -142,6 +143,19 @@ history-smoke:
 
 dashboard-resize-smoke:
 	xcrun swift scripts/verify-dashboard-resize-ui.swift
+
+text-smoke:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -framework AppKit -framework Foundation \
+		DictatorMD/Utilities/Settings.swift \
+		DictatorMD/Utilities/AppPaths.swift \
+		DictatorMD/Utilities/DebugLog.swift \
+		DictatorMD/Engine/ProsodyAnalyzer.swift \
+		DictatorMD/Engine/LocalProofreader.swift \
+		DictatorMD/Engine/TextCorrector.swift \
+		scripts/verify-text-corrector.swift \
+		-o /tmp/dictatormd-smoke/verify-text-corrector
+	@/tmp/dictatormd-smoke/verify-text-corrector
 
 run: app
 	open "$(APP_BUNDLE)"

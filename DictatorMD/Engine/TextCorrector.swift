@@ -29,6 +29,15 @@ final class TextCorrector: @unchecked Sendable {
         }
         result = fixAcronymsAndTerms(result)
         result = fixCustomTerms(result)
+        if AppSettings.shared.localProofreadingEnabled {
+            result = LocalProofreader.shared.proofread(
+                result,
+                language: AppSettings.shared.dictationLanguage,
+                protectedTerms: AppSettings.shared.customTerms
+            )
+        }
+        result = fixAcronymsAndTerms(result)
+        result = fixCustomTerms(result)
         result = fixCapitalization(result)
         result = removeRunawayRepetitions(result)
         if AppSettings.shared.intonationFormattingEnabled {
@@ -89,11 +98,20 @@ final class TextCorrector: @unchecked Sendable {
         var result: [String] = []
         var numberWords: [String] = []
 
-        func flushNumber() {
+        func flushNumber(followingWord: String? = nil) {
             guard !numberWords.isEmpty else { return }
             if let value = parseNumberWords(numberWords) {
-                // Format with commas for thousands: 1000 → "1,000"
-                result.append(formatNumber(value))
+                if shouldRenderNumberAsDigits(
+                    numberWords,
+                    value: value,
+                    precedingWord: result.last,
+                    followingWord: followingWord
+                ) {
+                    let suffix = numberWords.last?.trailingPunctuation ?? ""
+                    result.append(formatNumber(value) + suffix)
+                } else {
+                    result.append(contentsOf: numberWords)
+                }
             } else {
                 result.append(contentsOf: numberWords)
             }
@@ -105,7 +123,7 @@ final class TextCorrector: @unchecked Sendable {
             if Self.allNumberWords.contains(lower) {
                 // "and" only counts as part of a number if we're already in a number sequence
                 if lower == "and" && numberWords.isEmpty {
-                    flushNumber()
+                    flushNumber(followingWord: word)
                     result.append(word)
                 } else if lower == "a" && numberWords.isEmpty {
                     // "a hundred" = 100 — only if next word could be a scale
@@ -113,12 +131,15 @@ final class TextCorrector: @unchecked Sendable {
                 } else {
                     numberWords.append(word)
                 }
+                if word.hasNumberBoundaryPunctuation {
+                    flushNumber()
+                }
             } else {
                 // "a" followed by non-number word — flush as regular word
                 if numberWords.count == 1 && numberWords[0].lowercased() == "a" {
                     result.append(numberWords.removeFirst())
                 }
-                flushNumber()
+                flushNumber(followingWord: word)
                 result.append(word)
             }
         }
@@ -140,6 +161,35 @@ final class TextCorrector: @unchecked Sendable {
             return s
         }
         return String(value)
+    }
+
+    /// Editorial number formatting: prose counts one through ten remain words,
+    /// while quantities, technical references, money, measurements, and larger
+    /// values use digits. This avoids the old "every number becomes a digit" feel.
+    private func shouldRenderNumberAsDigits(
+        _ words: [String],
+        value: Int,
+        precedingWord: String?,
+        followingWord: String?
+    ) -> Bool {
+        let cleaned = words.map { $0.normalizedNumberWord }
+        let previous = precedingWord?.normalizedNumberWord ?? ""
+        let next = followingWord?.normalizedNumberWord ?? ""
+
+        if cleaned.contains(where: { Self.scaleMap[$0] != nil }) || value >= 11 || cleaned.count >= 2 {
+            return true
+        }
+
+        let numericContexts: Set<String> = [
+            "version", "v", "chapter", "step", "page", "item", "number", "no", "episode", "part",
+            "level", "phase", "model", "option", "ios", "macos", "windows", "ios", "iphone"
+        ]
+        let units: Set<String> = [
+            "%", "percent", "dollar", "dollars", "euro", "euros", "leva", "lev", "usd", "eur",
+            "mb", "gb", "tb", "kb", "hz", "khz", "mhz", "ghz", "ms", "second", "seconds", "minute", "minutes",
+            "hour", "hours", "day", "days", "week", "weeks", "month", "months", "year", "years", "am", "pm"
+        ]
+        return numericContexts.contains(previous) || units.contains(next)
     }
 
     private func parseNumberWords(_ words: [String]) -> Int? {
@@ -289,7 +339,7 @@ final class TextCorrector: @unchecked Sendable {
                 capitalizeNext = false
             } else if ".!?".contains(chars[i]) {
                 capitalizeNext = true
-            } else if chars[i].isLetter {
+            } else if chars[i].isLetter || chars[i].isNumber {
                 capitalizeNext = false
             }
         }
@@ -635,4 +685,18 @@ final class TextCorrector: @unchecked Sendable {
 
         return patterns
     }()
+}
+
+private extension String {
+    var normalizedNumberWord: String {
+        lowercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespacesAndNewlines))
+    }
+
+    var trailingPunctuation: String {
+        String(reversed().prefix { $0.isPunctuation }.reversed())
+    }
+
+    var hasNumberBoundaryPunctuation: Bool {
+        trailingPunctuation.contains { ",;:.!?".contains($0) }
+    }
 }
