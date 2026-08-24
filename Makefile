@@ -17,6 +17,7 @@ ALLOW_ADHOC ?= 0
 SWIFT_FILES := \
 	DictatorMD/Utilities/Settings.swift \
 	DictatorMD/Utilities/AppPaths.swift \
+	DictatorMD/Utilities/SingleInstanceCoordinator.swift \
 	DictatorMD/Utilities/DebugLog.swift \
 	DictatorMD/Utilities/AppUpdater.swift \
 	DictatorMD/Utilities/DictationMemory.swift \
@@ -46,7 +47,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke
 
 all: whisper app
 
@@ -161,6 +162,9 @@ text-smoke:
 
 insertion-smoke:
 	xcrun swift scripts/verify-insertion-compatibility.swift
+
+single-instance-smoke:
+	xcrun swift scripts/verify-single-instance.swift
 
 run: app
 	open "$(APP_BUNDLE)"

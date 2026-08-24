@@ -29,7 +29,8 @@ if ! codesign -d -r- "$APP_BUNDLE" 2>&1 | grep -q "certificate leaf = H\"$SIGN_C
   exit 1
 fi
 
-pkill -f "$EXECUTABLE" 2>/dev/null || true
+# A local development build can otherwise keep a second global hotkey/node alive.
+pkill -f '/Dictator-md.app/Contents/MacOS/DictatorMD' 2>/dev/null || true
 
 rm -rf /Applications/DictatorMD.app
 rm -rf "$HOME/Applications/DictatorMD.app"

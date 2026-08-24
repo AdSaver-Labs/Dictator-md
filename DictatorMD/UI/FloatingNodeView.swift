@@ -31,6 +31,7 @@ final class FloatingNodeController {
 
     func configure(engine: DictationEngine) {
         self.engine = engine
+        DebugLog.shared.log("[FloatingNode] configure enabled=\(AppSettings.shared.floatingNodeEnabled)")
         if AppSettings.shared.floatingNodeEnabled {
             show(engine: engine)
         } else {
@@ -39,6 +40,7 @@ final class FloatingNodeController {
     }
 
     func show(engine: DictationEngine) {
+        DebugLog.shared.log("[FloatingNode] show existingPanel=\(panel != nil)")
         if panel == nil {
             let panel = FloatingNodePanel(
                 contentRect: NSRect(x: 0, y: 0, width: collapsedIdlePanelSize.width, height: collapsedIdlePanelSize.height),
@@ -72,6 +74,7 @@ final class FloatingNodeController {
         panel?.contentView = host
         setPresentation(.collapsed, animated: false)
         panel?.orderFrontRegardless()
+        DebugLog.shared.log("[FloatingNode] visible=\(panel?.isVisible == true)")
 
         NotificationCenter.default.removeObserver(
             self,
