@@ -100,6 +100,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case selectedAudioDeviceUID
         case numberConversionEnabled
         case localProofreadingEnabled
+        case keepTranscriptOnClipboard
         case customTerms
         case floatingNodeEnabled
         case appearanceMode
@@ -185,6 +186,13 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     var localProofreadingEnabled: Bool {
         get { defaults.object(forKey: Key.localProofreadingEnabled.rawValue) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.localProofreadingEnabled.rawValue); objectWillChange.send() }
+    }
+
+    /// Keeps the final dictation available for manual paste when a third-party
+    /// app declines macOS accessibility insertion or Cmd-V.
+    var keepTranscriptOnClipboard: Bool {
+        get { defaults.object(forKey: Key.keepTranscriptOnClipboard.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.keepTranscriptOnClipboard.rawValue); objectWillChange.send() }
     }
 
     var customTerms: [String] {

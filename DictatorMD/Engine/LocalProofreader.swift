@@ -22,24 +22,25 @@ final class LocalProofreader: @unchecked Sendable {
             for match in matches.reversed() {
                 guard let range = Range(match.range, in: result) else { continue }
                 let word = String(result[range])
-                guard self.shouldCheck(word, protectedWords: protectedWords) else { continue }
+                guard self.shouldCheck(word, protectedWords: protectedWords, language: spellLanguage) else { continue }
 
-                let wordRange = NSRange(range, in: result)
                 let misspelling = checker.checkSpelling(
-                    of: result,
-                    startingAt: wordRange.location,
+                    of: word,
+                    startingAt: 0,
                     language: spellLanguage,
                     wrap: false,
                     inSpellDocumentWithTag: 0,
                     wordCount: nil
                 )
-                guard misspelling.location == wordRange.location, misspelling.length == wordRange.length,
-                      let suggestion = checker.guesses(
+                let wordRange = NSRange(location: 0, length: (word as NSString).length)
+                guard misspelling.location == 0, misspelling.length == wordRange.length,
+                      let suggestions = checker.guesses(
                         forWordRange: wordRange,
-                        in: result,
+                        in: word,
                         language: spellLanguage,
                         inSpellDocumentWithTag: 0
-                      )?.first,
+                      ),
+                      let suggestion = self.bestSuggestion(from: suggestions, for: word),
                       self.shouldApply(suggestion: suggestion, to: word) else {
                     continue
                 }
@@ -74,8 +75,9 @@ final class LocalProofreader: @unchecked Sendable {
         }
     }
 
-    private func shouldCheck(_ word: String, protectedWords: Set<String>) -> Bool {
+    private func shouldCheck(_ word: String, protectedWords: Set<String>, language: String) -> Bool {
         guard !protectedWords.contains(word.lowercased()),
+              !(language.lowercased().hasPrefix("bg") && BulgarianTextCorrector.isProtectedSlang(word)),
               word.rangeOfCharacter(from: .decimalDigits) == nil,
               !word.contains("-"),
               !word.contains("'"),
@@ -94,6 +96,17 @@ final class LocalProofreader: @unchecked Sendable {
             return false
         }
         return editDistance(word.lowercased(), suggestion.lowercased()) <= 2
+    }
+
+    private func bestSuggestion(from suggestions: [String], for word: String) -> String? {
+        suggestions
+            .filter { shouldApply(suggestion: $0, to: word) }
+            .min { left, right in
+                let leftDistance = editDistance(word.lowercased(), left.lowercased())
+                let rightDistance = editDistance(word.lowercased(), right.lowercased())
+                if leftDistance != rightDistance { return leftDistance < rightDistance }
+                return left.count < right.count
+            }
     }
 
     private func preserveCapitalization(of original: String, in suggestion: String) -> String {

@@ -21,7 +21,7 @@ final class TextInjector {
             let restoredTarget = restoreTargetIfNeeded(target)
             if !AXIsProcessTrusted() {
                 DebugLog.shared.log("[TextInjector] AX not trusted; trying clipboard paste fallback")
-                if restoredTarget, pasteWithClipboard(text: prepared) {
+                if restoredTarget, pasteWithClipboard(text: prepared, restoreClipboard: shouldRestoreClipboardAfterDictation) {
                     return true
                 }
                 DebugLog.shared.log("[TextInjector] AX clipboard paste failed; using direct unicode typing fallback")
@@ -193,7 +193,7 @@ final class TextInjector {
     }
 
     private func pasteWithClipboardRetry(text: String, target: InsertionTarget?) -> Bool {
-        let delays: [TimeInterval] = [0.05, 0.14, 0.28]
+        let delays: [TimeInterval] = [0.08, 0.20, 0.36]
         for (index, delay) in delays.enumerated() {
             let targetIsFrontmost: Bool
             if index > 0 {
@@ -210,7 +210,7 @@ final class TextInjector {
             guard restoreClickAnchorIfNeeded(target) else {
                 continue
             }
-            if pasteWithClipboard(text: text, restoreClipboard: index == delays.count - 1) {
+            if pasteWithClipboard(text: text, restoreClipboard: shouldRestoreClipboardAfterDictation) {
                 return true
             }
         }
@@ -220,8 +220,15 @@ final class TextInjector {
 
     private func requiresClipboardPaste(_ target: InsertionTarget?) -> Bool {
         switch target?.bundleIdentifier {
-        case "com.viber.osx":
-            DebugLog.shared.log("[TextInjector] compatibility clipboardPreferred bundle=com.viber.osx")
+        case "com.viber.osx",
+             "com.apple.MobileSMS",
+             "com.google.Chrome",
+             "com.google.Chrome.canary",
+             "com.brave.Browser",
+             "com.microsoft.edgemac",
+             "com.apple.Safari",
+             "org.mozilla.firefox":
+            DebugLog.shared.log("[TextInjector] compatibility clipboardPreferred bundle=\(target?.bundleIdentifier ?? "nil")")
             return true
         default:
             return false
@@ -240,6 +247,7 @@ final class TextInjector {
 
         switch target.bundleIdentifier {
         case "com.viber.osx",
+             "com.apple.MobileSMS",
              "com.google.Chrome",
              "com.google.Chrome.canary",
              "com.brave.Browser",
@@ -254,7 +262,11 @@ final class TextInjector {
     }
 
     private func pasteWithClipboard(text: String) -> Bool {
-        pasteWithClipboard(text: text, restoreClipboard: true)
+        pasteWithClipboard(text: text, restoreClipboard: shouldRestoreClipboardAfterDictation)
+    }
+
+    private var shouldRestoreClipboardAfterDictation: Bool {
+        !AppSettings.shared.keepTranscriptOnClipboard
     }
 
     private func pasteWithClipboard(text: String, restoreClipboard: Bool) -> Bool {

@@ -42,9 +42,9 @@ final class FloatingNodeController {
                 defer: false
             )
             panel.isReleasedWhenClosed = false
-            // Above normal/full-screen app windows, but below macOS security and
-            // system-critical surfaces such as the lock screen and screen saver.
-            panel.level = .popUpMenu
+            // A full-screen browser uses a higher window layer than pop-up menus.
+            // Stay below the actual screen saver but above normal app content.
+            panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
             panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
             panel.backgroundColor = .clear
             panel.isOpaque = false

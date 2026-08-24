@@ -21,6 +21,9 @@ final class TextCorrector: @unchecked Sendable {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         var result = text
+        if isBulgarianText(result) {
+            result = BulgarianTextCorrector.correct(result)
+        }
         if effectiveStyle == .polished {
             result = removeFillers(result)
         }
@@ -40,6 +43,8 @@ final class TextCorrector: @unchecked Sendable {
         result = fixCustomTerms(result)
         result = fixCapitalization(result)
         result = removeRunawayRepetitions(result)
+        // Lexical questions are safe to punctuate even if prosody formatting is off.
+        result = markQuestionLikeSentences(in: result, prosody: nil)
         if AppSettings.shared.intonationFormattingEnabled {
             result = applyIntonationFormatting(result, prosody: prosody)
         }
@@ -63,6 +68,10 @@ final class TextCorrector: @unchecked Sendable {
         }
         return result.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isBulgarianText(_ text: String) -> Bool {
+        text.unicodeScalars.contains { (0x0400...0x052F).contains($0.value) }
     }
 
     // MARK: - Pass 0: Number Word → Digit Conversion

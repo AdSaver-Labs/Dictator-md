@@ -26,6 +26,7 @@ SWIFT_FILES := \
 	DictatorMD/Engine/SoundFeedback.swift \
 	DictatorMD/Engine/ModelManager.swift \
 	DictatorMD/Engine/ProsodyAnalyzer.swift \
+	DictatorMD/Engine/BulgarianTextCorrector.swift \
 	DictatorMD/Engine/LocalProofreader.swift \
 	DictatorMD/Engine/TextCorrector.swift \
 	DictatorMD/Utilities/HotkeyMonitor.swift \
@@ -151,6 +152,7 @@ text-smoke:
 		DictatorMD/Utilities/AppPaths.swift \
 		DictatorMD/Utilities/DebugLog.swift \
 		DictatorMD/Engine/ProsodyAnalyzer.swift \
+		DictatorMD/Engine/BulgarianTextCorrector.swift \
 		DictatorMD/Engine/LocalProofreader.swift \
 		DictatorMD/Engine/TextCorrector.swift \
 		scripts/verify-text-corrector.swift \
