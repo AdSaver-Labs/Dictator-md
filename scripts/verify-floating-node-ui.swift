@@ -8,7 +8,7 @@ let sourceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("DictatorMD/UI/FloatingNodeView.swift")
 let source = try String(contentsOf: sourceURL, encoding: .utf8)
 guard source.contains("NSWindow.Level.screenSaver.rawValue - 1"),
-      source.contains(".fullScreenAuxiliary"),
+      source.contains(".canJoinAllApplications"),
       source.contains("NSWorkspace.activeSpaceDidChangeNotification"),
       source.contains("panel?.orderFrontRegardless()") else {
     fputs("Floating node is not configured to stay over full-screen app spaces.\n", stderr)

@@ -222,6 +222,7 @@ final class TextInjector {
         switch target?.bundleIdentifier {
         case "com.viber.osx",
              "com.apple.MobileSMS",
+             "com.lemon.lvoverseas",
              "com.google.Chrome",
              "com.google.Chrome.canary",
              "com.brave.Browser",
@@ -248,6 +249,7 @@ final class TextInjector {
         switch target.bundleIdentifier {
         case "com.viber.osx",
              "com.apple.MobileSMS",
+             "com.lemon.lvoverseas",
              "com.google.Chrome",
              "com.google.Chrome.canary",
              "com.brave.Browser",

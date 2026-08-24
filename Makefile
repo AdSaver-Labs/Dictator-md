@@ -46,7 +46,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke
 
 all: whisper app
 
@@ -158,6 +158,9 @@ text-smoke:
 		scripts/verify-text-corrector.swift \
 		-o /tmp/dictatormd-smoke/verify-text-corrector
 	@/tmp/dictatormd-smoke/verify-text-corrector
+
+insertion-smoke:
+	xcrun swift scripts/verify-insertion-compatibility.swift
 
 run: app
 	open "$(APP_BUNDLE)"

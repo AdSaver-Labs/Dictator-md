@@ -21,6 +21,11 @@ final class FloatingNodeController {
     private let expandedPanelSize = NSSize(width: 276, height: 58)
     private let previewPanelSize = NSSize(width: 360, height: 132)
     private let bottomOffset: CGFloat = 14
+    private let overlayCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces,
+        .stationary,
+        .canJoinAllApplications
+    ]
 
     private init() {}
 
@@ -45,7 +50,9 @@ final class FloatingNodeController {
             // A full-screen browser uses a higher window layer than pop-up menus.
             // Stay below the actual screen saver but above normal app content.
             panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
-            panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+            // Join every app's full-screen space. This is the AppKit behavior
+            // intended for persistent floating overlays, such as a recorder HUD.
+            panel.collectionBehavior = overlayCollectionBehavior
             panel.backgroundColor = .clear
             panel.isOpaque = false
             panel.hasShadow = false
@@ -159,7 +166,8 @@ final class FloatingNodeController {
 
     @objc private func activeSpaceDidChange() {
         guard panel?.isVisible == true else { return }
-        panel?.collectionBehavior.insert(.fullScreenAuxiliary)
+        panel?.collectionBehavior = overlayCollectionBehavior
+        panel?.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
         setPresentation(presentation, animated: false)
         panel?.orderFrontRegardless()
     }
