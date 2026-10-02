@@ -106,6 +106,7 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case appearanceMode
         case intonationFormattingEnabled
         case outputStyle
+        case removeHesitationSounds
         case applicationProfilesEnabled
         case previewBeforeInsert
         case escapeToCancelEnabled
@@ -191,8 +192,13 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
     /// Keeps the final dictation available for manual paste when a third-party
     /// app declines macOS accessibility insertion or Cmd-V.
     var keepTranscriptOnClipboard: Bool {
-        get { defaults.object(forKey: Key.keepTranscriptOnClipboard.rawValue) as? Bool ?? true }
+        get { defaults.object(forKey: Key.keepTranscriptOnClipboard.rawValue) as? Bool ?? false }
         set { defaults.set(newValue, forKey: Key.keepTranscriptOnClipboard.rawValue); objectWillChange.send() }
+    }
+
+    var removeHesitationSounds: Bool {
+        get { defaults.object(forKey: Key.removeHesitationSounds.rawValue) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: Key.removeHesitationSounds.rawValue); objectWillChange.send() }
     }
 
     var customTerms: [String] {

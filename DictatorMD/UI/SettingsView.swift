@@ -115,6 +115,29 @@ struct SettingsView: View {
             OnboardingView(isPresented: $showOnboarding)
                 .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
         }
+        .sheet(isPresented: Binding(
+            get: { engine.state == .preview && !settings.floatingNodeEnabled },
+            set: { if !$0 && engine.state == .preview { engine.discardPreview() } }
+        )) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Review dictation")
+                    .font(.headline)
+                TextEditor(text: Binding(
+                    get: { engine.previewText },
+                    set: { engine.previewText = $0 }
+                ))
+                .frame(minHeight: 180)
+                .border(.separator)
+                HStack {
+                    Spacer()
+                    Button("Discard") { engine.discardPreview() }
+                    Button("Insert") { engine.acceptPreview() }
+                        .keyboardShortcut(.return, modifiers: .command)
+                }
+            }
+            .padding(20)
+            .frame(minWidth: 480, minHeight: 280)
+        }
         .onAppear {
             if !hasCompletedOnboarding {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -2279,14 +2302,16 @@ private struct GeneralSection: View {
                     .frame(width: 260)
                     .labelsHidden()
                 }
-                Text("Raw preserves the transcript. Standard fixes casing and punctuation. Polished also removes common filler words. Everything remains local.")
+                Text("Raw keeps the transcript. Standard applies local spelling and formatting rules. Polished uses the same rules, with optional hesitation removal below. This is rule-based cleanup, not rewriting.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                Toggle("Remove hesitation sounds in Polished mode", isOn: $settings.removeHesitationSounds)
+                    .font(.system(size: 13))
                 Toggle("Choose output style automatically for each application", isOn: $settings.applicationProfilesEnabled)
                     .font(.system(size: 13))
                 Toggle("Review and edit before inserting", isOn: $settings.previewBeforeInsert)
                     .font(.system(size: 13))
-                Toggle("Show decoded text while processing", isOn: $settings.streamingPreviewEnabled)
+                Toggle("Show provisional text after recording, during decoding", isOn: $settings.streamingPreviewEnabled)
                     .font(.system(size: 13))
                 Toggle("Press Escape to cancel dictation", isOn: $settings.escapeToCancelEnabled)
                     .font(.system(size: 13))

@@ -4,6 +4,8 @@ import Foundation
 struct TextCorrectorSmoke {
     static func main() {
         let settings = AppSettings.shared
+        let originalHesitationSetting = settings.removeHesitationSounds
+        defer { settings.removeHesitationSounds = originalHesitationSetting }
         settings.grammarCorrectionEnabled = true
         settings.numberConversionEnabled = true
         settings.localProofreadingEnabled = true
@@ -26,6 +28,10 @@ struct TextCorrectorSmoke {
         let cityCorrect = corrector.correct("Благоевград и Велико Търново", language: .bulgarian)
         let colloquial = corrector.correct("Днеска нема да ходя", language: .bulgarian)
         let englishControl = corrector.correct("Blagoevgrad is a city", language: .english)
+        settings.removeHesitationSounds = true
+        let preservedMeaning = corrector.correct("I mean you know this matters", style: .polished, language: .english)
+        let cleanedHesitation = corrector.correct("Um this matters", style: .polished, language: .english)
+        let preservedBulgarianMeaning = corrector.correct("Ами значи това е важно", style: .polished, language: .bulgarian)
         let checks: [(String, () -> Bool)] = [
             ("small prose count", { prose.contains("two ideas") }),
             ("technical number", { version.lowercased().contains("version 2") }),
@@ -44,7 +50,10 @@ struct TextCorrectorSmoke {
             ("Bulgarian city transliteration", { cityLatin.contains("Благоевград") }),
             ("Bulgarian city protected", { cityCorrect.contains("Благоевград") && cityCorrect.contains("Велико Търново") }),
             ("Bulgarian colloquial protected", { colloquial.lowercased().contains("днеска нема") }),
-            ("English text unchanged", { englishControl.contains("Blagoevgrad") })
+            ("English text unchanged", { englishControl.contains("Blagoevgrad") }),
+            ("meaningful English phrases preserved", { preservedMeaning.lowercased().contains("i mean you know") }),
+            ("hesitation sounds removable", { !cleanedHesitation.lowercased().contains("um ") }),
+            ("meaningful Bulgarian phrases preserved", { preservedBulgarianMeaning.lowercased().contains("ами значи") })
         ]
 
         let failed = checks.compactMap { name, check in check() ? nil : name }

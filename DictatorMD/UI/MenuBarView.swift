@@ -15,7 +15,7 @@ struct MenuBarView: View {
                 .padding(.bottom, 10)
 
             // Alerts (permissions / errors)
-            if !permissions.allPermissionsGranted || engine.modelLoadError != nil {
+            if !permissions.allPermissionsGranted || engine.modelLoadError != nil || engine.userFacingError != nil {
                 alertsSection
                     .padding(.horizontal, 16)
                     .padding(.bottom, 10)
@@ -142,6 +142,19 @@ struct MenuBarView: View {
                     NSApp.activate(ignoringOtherApps: true)
                 }
             }
+            if let error = engine.userFacingError {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.system(size: 11))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.orange.opacity(0.10)))
+            }
         }
     }
 
@@ -165,6 +178,9 @@ struct MenuBarView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.quaternary.opacity(0.5))
                 )
+            Button("Copy transcription") { engine.copyLastTranscription() }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
         }
     }
 

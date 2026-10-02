@@ -25,7 +25,7 @@ final class TextCorrector: @unchecked Sendable {
         if language == .bulgarian || isBulgarianText(result) {
             result = BulgarianTextCorrector.correct(result)
         }
-        if effectiveStyle == .polished {
+        if effectiveStyle == .polished && AppSettings.shared.removeHesitationSounds {
             result = removeFillers(result)
         }
         if AppSettings.shared.numberConversionEnabled {
@@ -61,8 +61,8 @@ final class TextCorrector: @unchecked Sendable {
     private func removeFillers(_ text: String) -> String {
         var result = text
         let patterns = [
-            "(?i)\\b(?:um+|uh+|erm+|you know|i mean)\\b[,]?\\s*",
-            "\\b(?:ъм+|ъ+|ами|значи)\\b[,]?\\s*"
+            "(?i)\\b(?:um+|uh+|erm+)\\b[,]?\\s*",
+            "\\bъм+\\b[,]?\\s*"
         ]
         for pattern in patterns {
             result = result.replacingOccurrences(of: pattern, with: "", options: .regularExpression)

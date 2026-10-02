@@ -212,8 +212,7 @@ final class WhisperBridge: @unchecked Sendable {
             }
 
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
-            fputs("[WhisperBridge] Done (\(String(format: "%.2f", elapsed))s): \"\(trimmed)\"\n", stderr)
-            DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count) text=\"\(trimmed)\"")
+            DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count)")
             return Transcription(text: trimmed, language: effectiveLanguage)
         }
     }

@@ -25,6 +25,8 @@ SWIFT_FILES := \
 	DictatorMD/Engine/AutoLanguageDecision.swift \
 	DictatorMD/Engine/AudioCapture.swift \
 	DictatorMD/Engine/TextInjector.swift \
+	DictatorMD/Engine/PasteboardSnapshot.swift \
+	DictatorMD/Engine/DictationOperationGate.swift \
 	DictatorMD/Engine/SoundFeedback.swift \
 	DictatorMD/Engine/ModelManager.swift \
 	DictatorMD/Engine/ProsodyAnalyzer.swift \
@@ -49,7 +51,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke foundations-smoke
 
 all: whisper app
 
@@ -172,6 +174,15 @@ auto-language-smoke:
 
 insertion-smoke:
 	xcrun swift scripts/verify-insertion-compatibility.swift
+
+foundations-smoke:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -framework AppKit -framework Foundation \
+		DictatorMD/Engine/DictationOperationGate.swift \
+		DictatorMD/Engine/PasteboardSnapshot.swift \
+		scripts/verify-dictation-foundations.swift \
+		-o /tmp/dictatormd-smoke/verify-dictation-foundations
+	@/tmp/dictatormd-smoke/verify-dictation-foundations
 
 single-instance-smoke:
 	xcrun swift scripts/verify-single-instance.swift

@@ -222,7 +222,9 @@ final class HotkeyMonitor {
 
     private func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .leftMouseDown {
-            FocusTracker.shared.recordMouseDown(screenPoint: event.location)
+            if !FocusTracker.isSyntheticClick(event) {
+                FocusTracker.shared.recordMouseDown(screenPoint: event.location)
+            }
             return Unmanaged.passUnretained(event)
         }
 

@@ -19,12 +19,17 @@ struct ClickAnchor {
 
 final class FocusTracker {
     static let shared = FocusTracker()
+    static let syntheticClickMarker: Int64 = 0x444D44434C49434B
+
+    static func isSyntheticClick(_ event: CGEvent) -> Bool {
+        event.getIntegerValueField(.eventSourceUserData) == syntheticClickMarker
+    }
 
     private(set) var lastTargetApp: NSRunningApplication?
     private var lastClickAnchor: ClickAnchor?
     private var globalMouseMonitor: Any?
     private let ownBundleID = Bundle.main.bundleIdentifier
-    private let clickAnchorMaxAge: TimeInterval = 10 * 60
+    private let clickAnchorMaxAge: TimeInterval = 2 * 60
 
     private init() {
         update(from: NSWorkspace.shared.frontmostApplication)
@@ -53,31 +58,27 @@ final class FocusTracker {
 
     func currentInsertionTarget() -> InsertionTarget {
         let app = currentTargetApp()
-        let focusedElement = Self.focusedElement()
+        let systemFocusedElement = Self.focusedElement().flatMap { element -> AXUIElement? in
+            guard let app else { return nil }
+            var pid: pid_t = 0
+            return AXUIElementGetPid(element, &pid) == .success && pid == app.processIdentifier
+                ? element : nil
+        }
+        let focusedElement = systemFocusedElement ?? app.flatMap(Self.focusedElement(in:))
         return InsertionTarget(
             app: app,
             focusedElement: focusedElement,
-            focusedWindow: focusedElement.flatMap(Self.window(from:)),
+            focusedWindow: focusedElement.flatMap(Self.window(from:)) ?? app.flatMap(Self.focusedWindow(in:)),
             selectedTextRange: focusedElement.flatMap(Self.selectedTextRange(from:)),
             clickAnchor: validClickAnchor(for: app)
         )
     }
 
-    @discardableResult
-    func restoreAndSendUndo(target: InsertionTarget) -> Bool {
-        guard let app = target.app, !app.isTerminated else { return false }
-        app.activate(options: [.activateAllWindows])
-        Thread.sleep(forTimeInterval: 0.12)
-        guard let source = CGEventSource(stateID: .hidSystemState),
-              let down = CGEvent(keyboardEventSource: source, virtualKey: 6, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: 6, keyDown: false) else {
-            return false
-        }
-        down.flags = .maskCommand
-        up.flags = .maskCommand
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
-        return true
+    func isCurrentClickAnchor(_ anchor: ClickAnchor) -> Bool {
+        guard let current = lastClickAnchor else { return false }
+        return current.app.processIdentifier == anchor.app.processIdentifier
+            && current.capturedAt == anchor.capturedAt
+            && Date().timeIntervalSince(anchor.capturedAt) <= clickAnchorMaxAge
     }
 
     func recordMouseDown(screenPoint: CGPoint) {
@@ -118,7 +119,8 @@ final class FocusTracker {
     }
 
     private func startMouseTrackingFallback() {
-        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+            if let cgEvent = event.cgEvent, Self.isSyntheticClick(cgEvent) { return }
             let point = CGEvent(source: nil)?.location ?? NSEvent.mouseLocation
             self?.recordMouseDown(screenPoint: point)
         }
@@ -139,6 +141,22 @@ final class FocusTracker {
             &value
         )
         guard result == .success, let value else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    private static func focusedElement(in app: NSRunningApplication) -> AXUIElement? {
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &value) == .success,
+              let value else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    private static func focusedWindow(in app: NSRunningApplication) -> AXUIElement? {
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let value else { return nil }
         return (value as! AXUIElement)
     }
 

@@ -201,7 +201,7 @@ struct FloatingNodeView: View {
 
     var body: some View {
         ZStack(alignment: .center) {
-            if isHovering {
+            if isHovering || engine.state == .preview {
                 expandedNode
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)),
@@ -228,7 +228,11 @@ struct FloatingNodeView: View {
             collapseWorkItem = nil
         }
         .onChange(of: engine.state) { _, state in
-            if isHovering {
+            if state == .preview {
+                collapseWorkItem?.cancel()
+                isHovering = true
+                presentationChanged(.preview)
+            } else if isHovering {
                 presentationChanged(state == .preview ? .preview : .expanded)
             } else {
                 presentationChanged(.collapsed)
@@ -312,12 +316,12 @@ struct FloatingNodeView: View {
                         .help("Cancel (Escape)")
                     }
                     if isWorking { processingIndicator }
-                    if engine.canUndoLastInsertion {
-                        Button { engine.undoLastInsertion() } label: {
-                            Image(systemName: "arrow.uturn.backward")
+                    if !engine.lastTranscription.isEmpty {
+                        Button { engine.copyLastTranscription() } label: {
+                            Image(systemName: "doc.on.doc")
                         }
                         .buttonStyle(.plain)
-                        .help("Undo last insertion")
+                        .help("Copy last transcription")
                     }
                 }
                 settingsButton
@@ -440,6 +444,7 @@ struct FloatingNodeView: View {
     }
 
     private func handleHover(_ hovering: Bool) {
+        if engine.state == .preview { return }
         if hovering {
             collapseWorkItem?.cancel()
             collapseWorkItem = nil

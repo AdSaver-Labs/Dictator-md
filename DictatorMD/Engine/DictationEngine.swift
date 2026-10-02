@@ -41,6 +41,7 @@ final class DictationEngine {
     private var pendingPreviewAudioDuration: Double = 0
     private var pendingPreviewCleanupCutCount: Int = 0
     private var operationID = UUID()
+    private var operationGate = DictationOperationGate()
     private var escapeMonitor: Any?
     private var localEscapeMonitor: Any?
 
@@ -367,6 +368,8 @@ final class DictationEngine {
             return
         }
 
+        operationGate.cancel()
+        operationGate = DictationOperationGate()
         operationID = UUID()
         userFacingError = nil
         partialTranscription = ""
@@ -391,7 +394,9 @@ final class DictationEngine {
 
     func cancelCurrentOperation() {
         guard state != .idle else { return }
+        operationGate.cancel()
         operationID = UUID()
+        cancelPendingHotkeyActions()
         if state == .recording {
             _ = audioCapture.stopRecording()
             soundFeedback.playStopSound()
@@ -400,7 +405,9 @@ final class DictationEngine {
         previewText = ""
         pendingPreviewTarget = nil
         pendingPreviewLanguage = nil
-        userFacingError = "Dictation cancelled."
+        userFacingError = state == .typing
+            ? "Cancelled. If insertion had already started, check the destination. Your text remains in History."
+            : "Dictation cancelled."
         state = .idle
         DebugLog.shared.log("[DictationEngine] operation cancelled")
     }
@@ -414,25 +421,30 @@ final class DictationEngine {
         }
         let target = pendingPreviewTarget
         let language = pendingPreviewLanguage ?? AppSettings.shared.dictationLanguage
+        let audioDuration = pendingPreviewAudioDuration
+        let cleanupCutCount = pendingPreviewCleanupCutCount
+        let gate = operationGate
+        let currentOperationID = operationID
         state = .typing
-        let inserted = textInjector.insert(text: text, target: target)
-        if inserted {
-            DictationMemory.shared.record(
-                text: text,
-                language: language,
-                targetApp: target?.app,
-                audioDuration: pendingPreviewAudioDuration,
-                cleanupCutCount: pendingPreviewCleanupCutCount
-            )
-            lastTranscription = text
-            canUndoLastInsertion = true
-            userFacingError = nil
-        } else {
-            userFacingError = "Text could not be inserted. It was copied to the clipboard."
-        }
+        lastTranscription = text
         clearPendingPreview()
-        soundFeedback.playDoneSound()
-        state = .idle
+        DictationMemory.shared.record(
+            text: text,
+            language: language,
+            targetApp: target?.app,
+            audioDuration: audioDuration,
+            cleanupCutCount: cleanupCutCount
+        )
+        let injector = textInjector
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let outcome = injector.insert(text: text, target: target, shouldProceed: { gate.isActive })
+            await MainActor.run { [weak self] in
+                guard gate.isActive, self?.operationID == currentOperationID else { return }
+                self?.userFacingError = Self.insertionMessage(for: outcome)
+                self?.soundFeedback.playDoneSound()
+                self?.state = .idle
+            }
+        }
     }
 
     func discardPreview() {
@@ -444,9 +456,21 @@ final class DictationEngine {
     }
 
     func undoLastInsertion() {
-        guard canUndoLastInsertion, let target = insertionTarget else { return }
-        _ = FocusTracker.shared.restoreAndSendUndo(target: target)
-        canUndoLastInsertion = false
+        userFacingError = "Automatic undo is unavailable because the destination may have changed. Your text is in History."
+    }
+
+    func copyLastTranscription() {
+        guard !lastTranscription.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lastTranscription, forType: .string)
+    }
+
+    private static func insertionMessage(for outcome: InsertionOutcome) -> String? {
+        switch outcome {
+        case .confirmed: nil
+        case .sentUnverified: "Paste sent, but this app did not expose a readable result. Check the destination; the text is in History."
+        case .failed: "Could not verify the original text field. Nothing was sent; the text is in History."
+        }
     }
 
     private func clearPendingPreview() {
@@ -503,6 +527,7 @@ final class DictationEngine {
         state = .processing
         partialTranscription = ""
         let currentOperationID = operationID
+        let gate = operationGate
 
         let bridge = self.whisperBridge
         let language = AppSettings.shared.dictationLanguage
@@ -537,6 +562,7 @@ final class DictationEngine {
         Task.detached(priority: .userInitiated) { [weak self] in
             func resetToIdle() async {
                 await MainActor.run { [weak self] in
+                    guard gate.isActive, self?.operationID == currentOperationID else { return }
                     feedback.playDoneSound()
                     self?.state = .idle
                 }
@@ -547,13 +573,15 @@ final class DictationEngine {
                 return
             }
 
+            guard gate.isActive else { return }
+
             var transcription = bridge.transcribe(
                 audioBuffer: audioBuffer,
                 language: language,
                 prompt: prompt,
                 onSegment: AppSettings.shared.streamingPreviewEnabled ? { [weak self] segment in
                     Task { @MainActor in
-                        guard let self, self.operationID == currentOperationID else { return }
+                        guard let self, gate.isActive, self.operationID == currentOperationID else { return }
                         let separator = self.partialTranscription.isEmpty ? "" : " "
                         self.partialTranscription += separator + segment
                     }
@@ -593,10 +621,10 @@ final class DictationEngine {
             let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle, language: detectedLanguage)
             let fullText = Self.guardLanguageOutput(correctedText, language: detectedLanguage)
             let cleanupCutCount = DictationMemory.estimatedCleanupCutCount(raw: rawText, final: fullText)
-            fputs("[DictationEngine] Final text: \(fullText)\n", stderr)
-            DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count) text=\"\(fullText)\"")
+            DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count)")
 
-            guard await MainActor.run(body: { [weak self] in self?.operationID == currentOperationID }) else {
+            guard gate.isActive,
+                  await MainActor.run(body: { [weak self] in self?.operationID == currentOperationID }) else {
                 DebugLog.shared.log("[DictationEngine] discarded cancelled transcription")
                 return
             }
@@ -604,7 +632,7 @@ final class DictationEngine {
             if !Self.isLikelySilenceHallucination(fullText, audioDuration: audioDuration), !fullText.isEmpty {
                 if AppSettings.shared.previewBeforeInsert {
                     await MainActor.run { [weak self] in
-                        guard let self else { return }
+                        guard let self, gate.isActive, self.operationID == currentOperationID else { return }
                         self.previewText = fullText
                         self.partialTranscription = fullText
                         self.pendingPreviewTarget = target
@@ -612,11 +640,17 @@ final class DictationEngine {
                         self.pendingPreviewAudioDuration = audioDuration
                         self.pendingPreviewCleanupCutCount = cleanupCutCount
                         self.state = .preview
+                        if AppSettings.shared.floatingNodeEnabled {
+                            FloatingNodeController.shared.setPresentation(.preview)
+                        } else {
+                            SettingsWindowController.shared.show(engine: self)
+                        }
                     }
                     return
                 }
                 DebugLog.shared.log("[DictationEngine] insertingText target=\(targetApp?.localizedName ?? "nil")")
                 await MainActor.run {
+                    guard gate.isActive else { return }
                     DictationMemory.shared.record(
                         text: fullText,
                         language: detectedLanguage,
@@ -625,20 +659,24 @@ final class DictationEngine {
                         cleanupCutCount: cleanupCutCount
                     )
                 }
-                let inserted = injector.insert(text: fullText, target: target)
-                DebugLog.shared.log("[DictationEngine] insertionResult success=\(inserted)")
+                guard gate.isActive else { return }
+                let outcome = injector.insert(text: fullText, target: target, shouldProceed: { gate.isActive })
+                DebugLog.shared.log("[DictationEngine] insertionResult outcome=\(outcome)")
                 await MainActor.run { [weak self] in
-                    self?.canUndoLastInsertion = inserted
-                    self?.userFacingError = inserted ? nil : "Text could not be inserted. It was copied to the clipboard."
+                    guard gate.isActive, self?.operationID == currentOperationID else { return }
+                    self?.canUndoLastInsertion = false
+                    self?.userFacingError = Self.insertionMessage(for: outcome)
                 }
             } else {
                 DebugLog.shared.log("[DictationEngine] insertionSkipped emptyOrSilence audioDuration=\(String(format: "%.2f", audioDuration))")
                 await MainActor.run { [weak self] in
+                    guard gate.isActive, self?.operationID == currentOperationID else { return }
                     self?.userFacingError = "No clear speech was detected."
                 }
             }
 
             await MainActor.run { [weak self] in
+                guard gate.isActive, self?.operationID == currentOperationID else { return }
                 if !fullText.isEmpty {
                     self?.lastTranscription = fullText
                     self?.partialTranscription = ""
