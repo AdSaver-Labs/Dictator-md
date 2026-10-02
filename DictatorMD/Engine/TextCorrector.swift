@@ -22,7 +22,7 @@ final class TextCorrector: @unchecked Sendable {
         let startTime = CFAbsoluteTimeGetCurrent()
 
         var result = text
-        if isBulgarianText(result) {
+        if language == .bulgarian || isBulgarianText(result) {
             result = BulgarianTextCorrector.correct(result)
         }
         if effectiveStyle == .polished {

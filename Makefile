@@ -29,6 +29,7 @@ SWIFT_FILES := \
 	DictatorMD/Engine/ModelManager.swift \
 	DictatorMD/Engine/ProsodyAnalyzer.swift \
 	DictatorMD/Engine/BulgarianTextCorrector.swift \
+	DictatorMD/Engine/BulgarianPlaceNames.swift \
 	DictatorMD/Engine/LocalProofreader.swift \
 	DictatorMD/Engine/TextCorrector.swift \
 	DictatorMD/Utilities/HotkeyMonitor.swift \
@@ -87,6 +88,8 @@ $(BUILD_DIR)/DictatorMD: $(BUILD_DIR)/DictatorMD-arm64 $(BUILD_DIR)/DictatorMD-x
 app: $(BUILD_DIR)/DictatorMD
 	@mkdir -p "$(APP_BUNDLE)/Contents/MacOS"
 	@mkdir -p "$(APP_BUNDLE)/Contents/Resources"
+	@cp DictatorMD/Resources/BulgarianCities.json "$(APP_BUNDLE)/Contents/Resources/"
+	@cp DictatorMD/Resources/BulgarianCities.LICENSE.txt "$(APP_BUNDLE)/Contents/Resources/"
 	@cp $(BUILD_DIR)/DictatorMD "$(APP_BUNDLE)/Contents/MacOS/"
 	@sed \
 		-e 's/$$(EXECUTABLE_NAME)/DictatorMD/g' \
@@ -155,6 +158,7 @@ text-smoke:
 		DictatorMD/Utilities/DebugLog.swift \
 		DictatorMD/Engine/ProsodyAnalyzer.swift \
 		DictatorMD/Engine/BulgarianTextCorrector.swift \
+		DictatorMD/Engine/BulgarianPlaceNames.swift \
 		DictatorMD/Engine/LocalProofreader.swift \
 		DictatorMD/Engine/TextCorrector.swift \
 		scripts/verify-text-corrector.swift \

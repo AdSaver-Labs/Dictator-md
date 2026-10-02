@@ -20,6 +20,12 @@ struct TextCorrectorSmoke {
         let bulgarianSpacing = corrector.correct("неискам и немога")
         let bulgarianSlang = corrector.correct("щото кво някъв промпт")
         let bulgarianQuestion = corrector.correct("Как можем да го направим")
+        let cityCyrillic = corrector.correct("Отивам в Благоевграт утре", language: .bulgarian)
+        let citySeparated = corrector.correct("Благоев град е хубав", language: .bulgarian)
+        let cityLatin = corrector.correct("Błagojef Rat", language: .bulgarian)
+        let cityCorrect = corrector.correct("Благоевград и Велико Търново", language: .bulgarian)
+        let colloquial = corrector.correct("Днеска нема да ходя", language: .bulgarian)
+        let englishControl = corrector.correct("Blagoevgrad is a city", language: .english)
         let checks: [(String, () -> Bool)] = [
             ("small prose count", { prose.contains("two ideas") }),
             ("technical number", { version.lowercased().contains("version 2") }),
@@ -31,13 +37,20 @@ struct TextCorrectorSmoke {
             ("Bulgarian spelling", { bulgarianSpelling.lowercased().contains("въобще") && bulgarianSpelling.contains("сега") && bulgarianSpelling.contains("много") }),
             ("Bulgarian spacing", { bulgarianSpacing.contains("Не искам") && bulgarianSpacing.contains("не мога") }),
             ("Bulgarian slang", { bulgarianSlang.lowercased().contains("щото кво някъв промпт") }),
-            ("Bulgarian question", { bulgarianQuestion.hasSuffix("?") })
+            ("Bulgarian question", { bulgarianQuestion.hasSuffix("?") }),
+            ("Bulgarian city lexicon loaded", { BulgarianPlaceNames.cityCount >= 200 }),
+            ("Bulgarian city typo", { cityCyrillic.contains("Благоевград") }),
+            ("Bulgarian city spacing", { citySeparated.contains("Благоевград") }),
+            ("Bulgarian city transliteration", { cityLatin.contains("Благоевград") }),
+            ("Bulgarian city protected", { cityCorrect.contains("Благоевград") && cityCorrect.contains("Велико Търново") }),
+            ("Bulgarian colloquial protected", { colloquial.lowercased().contains("днеска нема") }),
+            ("English text unchanged", { englishControl.contains("Blagoevgrad") })
         ]
 
         let failed = checks.compactMap { name, check in check() ? nil : name }
         guard failed.isEmpty else {
             fputs("Text correction smoke test failed: \(failed.joined(separator: ", "))\n", stderr)
-            fputs("Outputs: \([prose, version, measurement, largeCount, money, sequence, punctuation, bulgarianSpelling, bulgarianSpacing, bulgarianSlang, bulgarianQuestion].joined(separator: " | "))\n", stderr)
+            fputs("Outputs: \([prose, version, measurement, largeCount, money, sequence, punctuation, bulgarianSpelling, bulgarianSpacing, bulgarianSlang, bulgarianQuestion, cityCyrillic, citySeparated, cityLatin, cityCorrect, colloquial, englishControl].joined(separator: " | "))\n", stderr)
             exit(1)
         }
         print("Text correction smoke test passed.")

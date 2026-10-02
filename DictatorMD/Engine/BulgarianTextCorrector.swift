@@ -8,12 +8,13 @@ enum BulgarianTextCorrector {
     private static let protectedSlang: Set<String> = [
         "щото", "щот", "кво", "къв", "ква", "кви", "някъв", "няква", "някви",
         "просто", "май", "нали", "аре", "айде", "бахти", "яко", "кеф", "кефи",
+        "днеска", "нема", "немаш", "туй", "тъй", "пич", "бате", "майна",
         "ап", "апликация", "сетинги", "шорткът", "хоткий", "промпт", "клауд",
         "бекенд", "фронтенд", "деплой", "репо", "комит", "пушвам", "мерджвам"
     ]
 
     static func correct(_ text: String) -> String {
-        var result = text
+        var result = BulgarianPlaceNames.correctObservedMishearings(text)
 
         // Frequent speech-to-text fusions where the intended standard Bulgarian
         // form is unambiguous in normal prose.

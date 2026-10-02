@@ -19,7 +19,12 @@ final class LocalProofreader: @unchecked Sendable {
 
             var result = text
             let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+            let protectedCityRanges = spellLanguage.lowercased().hasPrefix("bg")
+                ? BulgarianPlaceNames.protectedRanges(in: text) : []
             for match in matches.reversed() {
+                guard !protectedCityRanges.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else {
+                    continue
+                }
                 guard let range = Range(match.range, in: result) else { continue }
                 let word = String(result[range])
                 guard self.shouldCheck(word, protectedWords: protectedWords, language: spellLanguage) else { continue }
