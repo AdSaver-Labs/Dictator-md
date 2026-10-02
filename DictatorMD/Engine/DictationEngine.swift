@@ -547,7 +547,7 @@ final class DictationEngine {
                 return
             }
 
-            var rawText = bridge.transcribe(
+            var transcription = bridge.transcribe(
                 audioBuffer: audioBuffer,
                 language: language,
                 prompt: prompt,
@@ -559,15 +559,15 @@ final class DictationEngine {
                     }
                 } : nil
             )
-            DebugLog.shared.log("[DictationEngine] firstTranscription length=\(rawText.count)")
+            DebugLog.shared.log("[DictationEngine] firstTranscription length=\(transcription.text.count) language=\(transcription.language.whisperCode)")
 
-            if rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, audioDuration >= 0.45 {
+            if transcription.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, audioDuration >= 0.45 {
                 if Self.shouldRetryWithoutVAD(voiceEnergy) {
                     fputs("[DictationEngine] Empty VAD result; retrying without VAD.\n", stderr)
                     DebugLog.shared.log("[DictationEngine] retryWithoutVAD audioDuration=\(String(format: "%.2f", audioDuration)) rms=\(String(format: "%.5f", voiceEnergy.rms)) peak=\(String(format: "%.5f", voiceEnergy.peak))")
-                    rawText = bridge.transcribe(
+                    transcription = bridge.transcribe(
                         audioBuffer: audioBuffer,
-                        language: language,
+                        language: transcription.language,
                         useVAD: false,
                         prompt: prompt
                     )
@@ -576,10 +576,10 @@ final class DictationEngine {
                 }
             }
 
-            if Self.shouldRetryForLanguageViolation(rawText, language: language) {
-                let fallbackLanguage = Self.fallbackLanguage(for: language)
+            if Self.shouldRetryForLanguageViolation(transcription.text, language: transcription.language) {
+                let fallbackLanguage = Self.fallbackLanguage(for: transcription.language)
                 DebugLog.shared.log("[DictationEngine] retryLanguageViolation requested=\(language.whisperCode) fallback=\(fallbackLanguage.whisperCode)")
-                rawText = bridge.transcribe(
+                transcription = bridge.transcribe(
                     audioBuffer: audioBuffer,
                     language: fallbackLanguage,
                     useVAD: false,
@@ -587,9 +587,11 @@ final class DictationEngine {
                 )
             }
 
+            let detectedLanguage = transcription.language
+            let rawText = transcription.text
             let outputStyle = AppSettings.shared.effectiveOutputStyle(for: target?.bundleIdentifier)
-            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle)
-            let fullText = Self.guardLanguageOutput(correctedText, language: language)
+            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle, language: detectedLanguage)
+            let fullText = Self.guardLanguageOutput(correctedText, language: detectedLanguage)
             let cleanupCutCount = DictationMemory.estimatedCleanupCutCount(raw: rawText, final: fullText)
             fputs("[DictationEngine] Final text: \(fullText)\n", stderr)
             DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count) text=\"\(fullText)\"")
@@ -606,7 +608,7 @@ final class DictationEngine {
                         self.previewText = fullText
                         self.partialTranscription = fullText
                         self.pendingPreviewTarget = target
-                        self.pendingPreviewLanguage = language
+                        self.pendingPreviewLanguage = detectedLanguage
                         self.pendingPreviewAudioDuration = audioDuration
                         self.pendingPreviewCleanupCutCount = cleanupCutCount
                         self.state = .preview
@@ -617,7 +619,7 @@ final class DictationEngine {
                 await MainActor.run {
                     DictationMemory.shared.record(
                         text: fullText,
-                        language: language,
+                        language: detectedLanguage,
                         targetApp: targetApp,
                         audioDuration: audioDuration,
                         cleanupCutCount: cleanupCutCount

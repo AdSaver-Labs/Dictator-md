@@ -33,6 +33,11 @@ private func segmentCallback(
 }
 
 final class WhisperBridge: @unchecked Sendable {
+    struct Transcription {
+        let text: String
+        let language: AppSettings.DictationLanguage
+    }
+
     private let context: OpaquePointer
     private let queue = DispatchQueue(label: "com.DictatorMD.whisper", qos: .userInitiated)
     private let vadModelPath: String?
@@ -98,7 +103,7 @@ final class WhisperBridge: @unchecked Sendable {
         useVAD: Bool = true,
         prompt: String = "",
         onSegment: ((String) -> Void)? = nil
-    ) -> String {
+    ) -> Transcription {
         queue.sync {
             let startTime = CFAbsoluteTimeGetCurrent()
             let audioDuration = Double(audioBuffer.count) / 16000.0
@@ -194,7 +199,7 @@ final class WhisperBridge: @unchecked Sendable {
             guard result == 0 else {
                 fputs("[WhisperBridge] Failed (\(result)) in \(String(format: "%.2f", elapsed))s\n", stderr)
                 DebugLog.shared.log("[WhisperBridge] failed code=\(result) elapsed=\(String(format: "%.2f", elapsed))")
-                return ""
+                return Transcription(text: "", language: effectiveLanguage)
             }
 
             // Collect full transcription (callback already typed segments incrementally)
@@ -209,7 +214,7 @@ final class WhisperBridge: @unchecked Sendable {
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             fputs("[WhisperBridge] Done (\(String(format: "%.2f", elapsed))s): \"\(trimmed)\"\n", stderr)
             DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count) text=\"\(trimmed)\"")
-            return trimmed
+            return Transcription(text: trimmed, language: effectiveLanguage)
         }
     }
 
@@ -228,38 +233,56 @@ final class WhisperBridge: @unchecked Sendable {
 
         let maxLanguageID = whisper_lang_max_id()
         guard maxLanguageID > 0 else { return .english }
-
-        let melStatus = audioBuffer.withUnsafeBufferPointer { ptr in
-            whisper_pcm_to_mel(context, ptr.baseAddress, Int32(audioBuffer.count), Int32(threadCount))
-        }
-        guard melStatus == 0 else {
-            DebugLog.shared.log("[WhisperBridge] restrictedAuto melFailed status=\(melStatus) fallback=en")
-            return .english
-        }
-
-        var probabilities = [Float](repeating: 0, count: Int(maxLanguageID) + 1)
-        let topLanguageID = probabilities.withUnsafeMutableBufferPointer { ptr in
-            whisper_lang_auto_detect(context, 0, Int32(threadCount), ptr.baseAddress)
-        }
-
         let englishID = whisper_lang_id("en")
         let bulgarianID = whisper_lang_id("bg")
-        let englishProbability = Self.probability(probabilities, id: englishID)
-        let bulgarianProbability = Self.probability(probabilities, id: bulgarianID)
-        let topLanguage = Self.languageCode(for: topLanguageID) ?? "unknown"
+        let openingSamples = min(audioBuffer.count, 2 * 16000)
+        var cachedDetection: (sampleCount: Int, english: Float, bulgarian: Float, top: String)?
 
-        // Auto mode is intentionally restricted to the two languages the app supports.
-        // Bulgarian often loses a little probability to English on short mixed-tech
-        // prompts, so allow it when it is top-ranked or close enough to English.
-        let chosen: AppSettings.DictationLanguage =
-            topLanguageID == bulgarianID
-            || bulgarianProbability >= 0.10
-            || (bulgarianProbability >= 0.03 && bulgarianProbability >= englishProbability * 0.85)
-            ? .bulgarian
-            : .english
+        func detect(sampleCount: Int, requireStrongEvidence: Bool) -> AppSettings.DictationLanguage? {
+            if let cachedDetection, cachedDetection.sampleCount == sampleCount {
+                return AutoLanguageDecision.choose(
+                    english: cachedDetection.english,
+                    bulgarian: cachedDetection.bulgarian,
+                    topLanguage: cachedDetection.top,
+                    requireStrongEvidence: requireStrongEvidence
+                )
+            }
+            let melStatus = audioBuffer.withUnsafeBufferPointer { ptr in
+                whisper_pcm_to_mel(context, ptr.baseAddress, Int32(sampleCount), Int32(threadCount))
+            }
+            guard melStatus == 0 else {
+                DebugLog.shared.log("[WhisperBridge] autoDetection melFailed status=\(melStatus)")
+                return nil
+            }
 
-        DebugLog.shared.log("[WhisperBridge] restrictedAuto top=\(topLanguage) en=\(String(format: "%.4f", englishProbability)) bg=\(String(format: "%.4f", bulgarianProbability)) chosen=\(chosen.whisperCode)")
-        return chosen
+            var probabilities = [Float](repeating: 0, count: Int(maxLanguageID) + 1)
+            let topLanguageID = probabilities.withUnsafeMutableBufferPointer { ptr in
+                whisper_lang_auto_detect(context, 0, Int32(threadCount), ptr.baseAddress)
+            }
+            guard topLanguageID >= 0 else { return nil }
+
+            let englishProbability = Self.probability(probabilities, id: englishID)
+            let bulgarianProbability = Self.probability(probabilities, id: bulgarianID)
+            let topLanguage = Self.languageCode(for: topLanguageID) ?? "unknown"
+            cachedDetection = (sampleCount, englishProbability, bulgarianProbability, topLanguage)
+            let chosen = AutoLanguageDecision.choose(
+                english: englishProbability,
+                bulgarian: bulgarianProbability,
+                topLanguage: topLanguage,
+                requireStrongEvidence: requireStrongEvidence
+            )
+            DebugLog.shared.log("[WhisperBridge] autoDetection seconds=\(String(format: "%.2f", Double(sampleCount) / 16000)) top=\(topLanguage) en=\(String(format: "%.4f", englishProbability)) bg=\(String(format: "%.4f", bulgarianProbability)) chosen=\(chosen?.whisperCode ?? "uncertain")")
+            return chosen
+        }
+
+        if openingSamples >= 16000,
+           let openingLanguage = detect(sampleCount: openingSamples, requireStrongEvidence: true) {
+            return openingLanguage
+        }
+        if let fullLanguage = detect(sampleCount: audioBuffer.count, requireStrongEvidence: false) {
+            return fullLanguage
+        }
+        return .english
     }
 
     private static func probability(_ probabilities: [Float], id: Int32) -> Float {

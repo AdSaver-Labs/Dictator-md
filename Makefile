@@ -22,6 +22,7 @@ SWIFT_FILES := \
 	DictatorMD/Utilities/AppUpdater.swift \
 	DictatorMD/Utilities/DictationMemory.swift \
 	DictatorMD/Engine/WhisperBridge.swift \
+	DictatorMD/Engine/AutoLanguageDecision.swift \
 	DictatorMD/Engine/AudioCapture.swift \
 	DictatorMD/Engine/TextInjector.swift \
 	DictatorMD/Engine/SoundFeedback.swift \
@@ -47,7 +48,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke
 
 all: whisper app
 
@@ -159,6 +160,11 @@ text-smoke:
 		scripts/verify-text-corrector.swift \
 		-o /tmp/dictatormd-smoke/verify-text-corrector
 	@/tmp/dictatormd-smoke/verify-text-corrector
+
+auto-language-smoke:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc DictatorMD/Utilities/Settings.swift DictatorMD/Engine/AutoLanguageDecision.swift scripts/verify-auto-language.swift -o /tmp/dictatormd-smoke/verify-auto-language
+	@/tmp/dictatormd-smoke/verify-auto-language
 
 insertion-smoke:
 	xcrun swift scripts/verify-insertion-compatibility.swift

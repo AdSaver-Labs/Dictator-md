@@ -13,7 +13,8 @@ final class TextCorrector: @unchecked Sendable {
     func correct(
         _ text: String,
         prosody: ProsodyFeatures? = nil,
-        style: AppSettings.OutputStyle? = nil
+        style: AppSettings.OutputStyle? = nil,
+        language: AppSettings.DictationLanguage? = nil
     ) -> String {
         let effectiveStyle = style ?? AppSettings.shared.outputStyle
         if effectiveStyle == .raw { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -35,7 +36,7 @@ final class TextCorrector: @unchecked Sendable {
         if AppSettings.shared.localProofreadingEnabled {
             result = LocalProofreader.shared.proofread(
                 result,
-                language: AppSettings.shared.dictationLanguage,
+                language: language ?? AppSettings.shared.dictationLanguage,
                 protectedTerms: AppSettings.shared.customTerms
             )
         }

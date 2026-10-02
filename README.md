@@ -83,6 +83,7 @@ The current platform audit and execution order are maintained in [`docs/PLATFORM
 - **Number word conversion** -- "two four six eight" becomes "2,468", "three hundred forty two" becomes "342"
 - **Multiple Whisper models** -- Base (142 MB, fastest), Small (466 MB, balanced), Medium (1.5 GB, most accurate)
 - **Configurable hotkey** -- right Option by default, rebind to any key
+- **Automatic English/Bulgarian selection** -- Auto checks the opening speech and uses more of the recording when the start is unclear; EN and BG remain available as manual choices
 - **Sound feedback** -- subtle audio cues for recording start, stop, and completion
 - **Polished native UI** -- SwiftUI menu bar app with sidebar settings, dark/light mode support
 - **Open source** -- MIT licensed, no telemetry, no analytics
