@@ -25,27 +25,45 @@ final class TextInjector {
         DebugLog.shared.log("[TextInjector] insert length=\(prepared.count) target=\(target?.appName ?? "nil") bundle=\(target?.bundleIdentifier ?? "nil") hasElement=\(target?.focusedElement != nil)")
 
         return typingQueue.sync {
+            let clipboardAtStart = NSPasteboard.general.changeCount
+            var outcome = InsertionOutcome.failed
+            defer {
+                if outcome != .confirmed, shouldProceed(),
+                   NSPasteboard.general.changeCount == clipboardAtStart {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(prepared, forType: .string)
+                    DebugLog.shared.log("[TextInjector] clipboardRecovery stored outcome=\(outcome)")
+                }
+            }
             guard AXIsProcessTrusted() else {
                 DebugLog.shared.log("[TextInjector] AX not trusted; cannot verify destination")
                 return .failed
             }
-            guard shouldProceed(), restoreTargetIfNeeded(target) else { return .failed }
+            guard shouldProceed(), restoreTargetIfNeeded(target) else {
+                DebugLog.shared.log("[TextInjector] destinationRestore failed")
+                return .failed
+            }
 
             if !requiresClipboardPaste(target),
                let directResult = insertDirectlyWithAccessibility(text: prepared, target: target, shouldProceed: shouldProceed) {
-                return directResult
+                outcome = directResult
+                return outcome
             }
 
-            if shouldProceed(), verifyTargetFocus(target), restoreClickAnchorIfNeeded(target) {
+            if shouldProceed(), restoreClickAnchorIfNeeded(target), verifyTargetFocus(target) {
                 let pasteResult = pasteWithClipboard(text: prepared, target: target, restoreClipboard: shouldRestoreClipboardAfterDictation, shouldProceed: shouldProceed)
-                if pasteResult.wasSent { return pasteResult }
+                if pasteResult.wasSent {
+                    outcome = pasteResult
+                    return outcome
+                }
             }
 
             if let element = target?.focusedElement, shouldProceed(), verifyTargetFocus(target) {
                 let before = readableValue(of: element)
                 if typeUnicode(text: prepared, shouldProceed: shouldProceed, target: target) {
-                    return confirmedChange(before: before, after: readableValue(of: element), insertedText: prepared)
+                    outcome = confirmedChange(before: before, after: readableValue(of: element), insertedText: prepared)
                         ? .confirmed : .sentUnverified
+                    return outcome
                 }
             }
 
@@ -65,25 +83,19 @@ final class TextInjector {
     private func restoreTargetIfNeeded(_ target: InsertionTarget?) -> Bool {
         let targetApp = target?.app
         guard let targetApp,
-              targetApp.bundleIdentifier != Bundle.main.bundleIdentifier,
+              targetApp.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               !targetApp.isTerminated else {
             DebugLog.shared.log("[TextInjector] activationSkipped target=\(targetApp?.localizedName ?? "nil")")
             return false
         }
 
-        if isAppFrontmost(targetApp) {
-            DebugLog.shared.log("[TextInjector] activationSkipped alreadyFrontmost target=\(targetApp.localizedName ?? "nil")")
-            if let focusedElement = target?.focusedElement {
-                _ = setFocused(true, on: focusedElement)
-                _ = restoreSelectedTextRange(target?.selectedTextRange, on: focusedElement)
-            }
-            return verifyTargetFocus(target)
+        if !isAppFrontmost(targetApp) {
+            targetApp.activate(options: [.activateAllWindows])
+            DebugLog.shared.log("[TextInjector] activateTarget name=\(targetApp.localizedName ?? "nil") pid=\(targetApp.processIdentifier)")
+            guard waitUntilFrontmost(targetApp, timeout: 1.25) else { return false }
         }
 
-        targetApp.activate(options: [.activateAllWindows])
-        DebugLog.shared.log("[TextInjector] activateTarget name=\(targetApp.localizedName ?? "nil") pid=\(targetApp.processIdentifier)")
-        Thread.sleep(forTimeInterval: 0.20)
-
+        // Restore the captured window even if another window of the same app is frontmost.
         if let focusedWindow = target?.focusedWindow {
             AXUIElementPerformAction(focusedWindow, kAXRaiseAction as CFString)
             let appElement = AXUIElementCreateApplication(targetApp.processIdentifier)
@@ -97,7 +109,7 @@ final class TextInjector {
         }
 
         guard let focusedElement = target?.focusedElement else {
-            let restored = waitUntilFrontmost(targetApp, timeout: 1.25) && verifyTargetFocus(target)
+            let restored = verifyTargetWindow(target) && target?.clickAnchor != nil
             DebugLog.shared.log("[TextInjector] clickAnchorOnly restore=\(restored)")
             return restored
         }
@@ -114,28 +126,28 @@ final class TextInjector {
         Thread.sleep(forTimeInterval: 0.10)
         let restored = waitUntilFrontmost(targetApp, timeout: 1.25)
         DebugLog.shared.log("[TextInjector] restoreTarget frontmost=\(restored) current=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
-        return restored && verifyTargetFocus(target)
+        // Custom editors may require a click before AX reports keyboard focus.
+        return restored && verifyTargetWindow(target)
+    }
+
+    private func verifyTargetWindow(_ target: InsertionTarget?) -> Bool {
+        guard let target, let app = target.app, isAppFrontmost(app), !app.isTerminated else { return false }
+        guard let window = target.focusedWindow else { return target.focusedElement != nil }
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var currentWindow: CFTypeRef?
+        return AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &currentWindow) == .success
+            && currentWindow.map { CFEqual(window, $0) } == true
     }
 
     private func verifyTargetFocus(_ target: InsertionTarget?) -> Bool {
-        guard let target, let app = target.app, isAppFrontmost(app), !app.isTerminated else { return false }
+        guard let target, let app = target.app, verifyTargetWindow(target) else { return false }
         guard let expected = target.focusedElement else {
-            guard target.clickAnchor.map(FocusTracker.shared.isCurrentClickAnchor) == true,
-                  let window = target.focusedWindow else { return false }
-            let appElement = AXUIElementCreateApplication(app.processIdentifier)
-            var currentWindow: CFTypeRef?
-            return AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &currentWindow) == .success
-                && currentWindow.map { CFEqual(window, $0) } == true
+            return target.clickAnchor != nil && target.focusedWindow != nil
         }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
               let focused, CFEqual(expected, focused) else { return false }
-        if let window = target.focusedWindow {
-            var currentWindow: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &currentWindow) == .success,
-                  let currentWindow, CFEqual(window, currentWindow) else { return false }
-        }
         return true
     }
 
@@ -163,13 +175,27 @@ final class TextInjector {
             Thread.sleep(forTimeInterval: 0.12)
         }
 
-        guard FocusTracker.shared.isCurrentClickAnchor(anchor), postMouseClick(at: anchor.screenPoint) else {
+        guard verifyTargetWindow(target),
+              let capturedFrame = target.windowFrame,
+              let currentFrame = target.focusedWindow.flatMap(FocusTracker.frame(of:)),
+              abs(capturedFrame.width - currentFrame.width) < 2,
+              abs(capturedFrame.height - currentFrame.height) < 2 else {
+            DebugLog.shared.log("[TextInjector] clickAnchor skipped changedOrMissingWindowGeometry")
+            return target.focusedElement != nil && verifyTargetFocus(target)
+        }
+        // This anchor belongs to this operation, not to the latest mouse click.
+        let point = CGPoint(x: anchor.screenPoint.x + currentFrame.minX - capturedFrame.minX,
+                            y: anchor.screenPoint.y + currentFrame.minY - capturedFrame.minY)
+        guard currentFrame.contains(point), postMouseClick(at: point) else {
             DebugLog.shared.log("[TextInjector] clickAnchor clickFailed point=\(Int(anchor.screenPoint.x)),\(Int(anchor.screenPoint.y))")
             return false
         }
 
         DebugLog.shared.log("[TextInjector] clickAnchor restored point=\(Int(anchor.screenPoint.x)),\(Int(anchor.screenPoint.y))")
         Thread.sleep(forTimeInterval: 0.16)
+        if let field = target.focusedElement {
+            _ = restoreSelectedTextRange(target.selectedTextRange, on: field)
+        }
         return true
     }
 
@@ -212,7 +238,7 @@ final class TextInjector {
 
     private func confirmedChange(before: String?, after: String?, insertedText: String) -> Bool {
         guard let before, let after else { return false }
-        return after != before && after.contains(insertedText)
+        return after != before && after.contains(insertedText.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private func prepareForInsertion(_ text: String) -> String {
@@ -234,6 +260,10 @@ final class TextInjector {
              "com.brave.Browser",
              "com.microsoft.edgemac",
              "com.apple.Safari",
+             "com.openai.codex",
+             "notion.id",
+             "com.tinyspeck.slackmacgap",
+             "company.thebrowser.Browser",
              "org.mozilla.firefox":
             DebugLog.shared.log("[TextInjector] compatibility clipboardPreferred bundle=\(target?.bundleIdentifier ?? "nil")")
             return true
@@ -247,7 +277,7 @@ final class TextInjector {
               target.clickAnchor != nil else {
             return false
         }
-        return target.focusedElement == nil
+        return target.focusedElement == nil || requiresClipboardPaste(target) || !verifyTargetFocus(target)
     }
 
     private var shouldRestoreClipboardAfterDictation: Bool {
@@ -276,14 +306,23 @@ final class TextInjector {
 
         guard shouldProceed(), verifyTargetFocus(target), postPasteShortcut() else {
             DebugLog.shared.log("[TextInjector] paste cancelled or target changed before shortcut")
-            snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: 0)
+            if !shouldProceed() {
+                snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: 0)
+            }
             return .failed
         }
 
-        Thread.sleep(forTimeInterval: 0.12)
-        let confirmed = confirmedChange(before: before, after: readableValue(of: target?.focusedElement), insertedText: text)
+        // Let the receiving application's event loop consume paste before readback.
+        var confirmed = false
+        let deadline = Date().addingTimeInterval(before == nil ? 0.20 : 0.80)
+        repeat {
+            Thread.sleep(forTimeInterval: 0.04)
+            confirmed = confirmedChange(before: before, after: readableValue(of: target?.focusedElement), insertedText: text)
+            if confirmed { break }
+        } while Date() < deadline
         DebugLog.shared.log("[TextInjector] postPasteShortcut sent confirmed=\(confirmed)")
-        if restoreClipboard {
+        // Keep unverified delivery recoverable; never retry a posted paste blindly.
+        if restoreClipboard && confirmed {
             snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
         }
         return confirmed ? .confirmed : .sentUnverified

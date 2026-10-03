@@ -96,6 +96,9 @@ jobs:
       - name: Build app
         run: make app ALLOW_ADHOC=1
 
+      - name: Verify dictation foundations and compile live delivery harness
+        run: make text-smoke auto-language-smoke foundations-smoke insertion-smoke live-insertion-build
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

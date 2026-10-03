@@ -468,8 +468,8 @@ final class DictationEngine {
     private static func insertionMessage(for outcome: InsertionOutcome) -> String? {
         switch outcome {
         case .confirmed: nil
-        case .sentUnverified: "Paste sent, but this app did not expose a readable result. Check the destination; the text is in History."
-        case .failed: "Could not verify the original text field. Nothing was sent; the text is in History."
+        case .sentUnverified: "Paste sent but not confirmed. Your text is available on the clipboard and in History."
+        case .failed: "Could not restore the original text field. Your text is in History and copied unless you copied something else."
         }
     }
 

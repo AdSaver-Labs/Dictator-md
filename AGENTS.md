@@ -68,6 +68,13 @@ Do not break the current dictation product:
 
 Any voice-platform expansion must preserve this working core.
 
+For focus/insertion changes, also read `docs/DICTATION_COMPATIBILITY.md` and run
+`make live-insertion-smoke` on a Mac with Accessibility permission. This opens
+disposable external editors and checks real delivered text. A build, grep-based
+contract check, or posted Cmd-V event alone is not delivery proof. Do not make a
+captured destination depend on the latest mouse click or an elapsed recording
+timeout. Keep stable signing and retain failed/unverified transcripts for recovery.
+
 ## Current Platform Status
 
 ### macOS

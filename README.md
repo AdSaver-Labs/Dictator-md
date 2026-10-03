@@ -106,7 +106,7 @@ grep -rE "URLSession|http" DictatorMD/**/*.swift
 - ❌ Send audio or transcriptions anywhere
 - ❌ Track, analyze, or log anything
 - ❌ Auto-install updates without your click, telemetry, or license-check
-- ❌ Read your clipboard
+- ❌ Store or upload clipboard contents. Clipboard paste temporarily snapshots the existing clipboard in memory so it can be restored after confirmed delivery; failed/unverified dictation keeps its text available for recovery.
 - ❌ Load web fonts or external scripts
 - ❌ Require an account or an internet connection
 

@@ -51,7 +51,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke foundations-smoke
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke foundations-smoke live-insertion-smoke live-insertion-build
 
 all: whisper app
 
@@ -174,6 +174,21 @@ auto-language-smoke:
 
 insertion-smoke:
 	xcrun swift scripts/verify-insertion-compatibility.swift
+
+live-insertion-smoke: live-insertion-build
+	@/tmp/dictatormd-smoke/verify-live-insertion
+
+live-insertion-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -framework AppKit -framework CoreGraphics \
+		DictatorMD/Utilities/Settings.swift \
+		DictatorMD/Utilities/AppPaths.swift \
+		DictatorMD/Utilities/DebugLog.swift \
+		DictatorMD/Utilities/FocusTracker.swift \
+		DictatorMD/Engine/PasteboardSnapshot.swift \
+		DictatorMD/Engine/TextInjector.swift \
+		scripts/verify-live-insertion.swift \
+		-o /tmp/dictatormd-smoke/verify-live-insertion
 
 foundations-smoke:
 	@mkdir -p /tmp/dictatormd-smoke

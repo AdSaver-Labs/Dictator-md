@@ -18,7 +18,7 @@ Dictator-md is a macOS dictation app that requires two sensitive permissions: **
 - No network requests except for **user-initiated model downloads** from HuggingFace.
 - No automatic updates / update server.
 - No account, license check, or any "phone home" behavior.
-- No clipboard access.
+- Clipboard paste snapshots existing representations in memory for restoration after confirmed delivery. Clipboard contents are never logged, persisted, or uploaded. Failed/unverified transcripts remain available for recovery; a newer user copy is not overwritten by restoration.
 - No web content or external scripts (the app is 100% native Swift/SwiftUI).
 
 ## Auditability

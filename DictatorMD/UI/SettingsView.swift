@@ -3647,7 +3647,11 @@ private struct ProtocolsSection: View {
                     "Hotkey capture must keep a working fallback: event tap when Accessibility is trusted, NSEvent fallback when it is not.",
                     "Recording must not start unless the local model is loaded and microphone access is authorized.",
                     "Insertion must preserve the target app captured at recording start and keep direct Unicode typing as the fallback.",
+                    "Capture the original window, field, selection and window geometry once. Later clicks and long processing must not invalidate that operation's destination.",
+                    "Restore the original window even when another window of the same app is active. Never send text to the newly focused app as a fallback.",
+                    "A posted paste is not proof of delivery. Read back when available; never blindly repeat a posted paste, and keep failed or unverified text recoverable on the clipboard without overwriting a newer user copy.",
                     "Clipboard paste may be optimized, but it must never replace the direct typing fallback or silently discard the transcript.",
+                    "Run make live-insertion-smoke before shipping focus or insertion changes; source-contract checks alone cannot prove that text was delivered.",
                     "After any change to hotkey, permissions, audio, transcription, focus tracking, or insertion, run a real dictation test into another app before handoff."
                 ])
             }

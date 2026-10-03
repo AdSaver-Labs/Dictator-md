@@ -1,8 +1,15 @@
 # Dictation Compatibility Checkpoint
 
-Version 1.0.29 introduces conservative target verification. If the original field
-cannot be reidentified, Dictator-md does not guess at another field. A transcript
-is still saved in History, with a Copy command in the menu bar and floating node.
+Version 1.0.30 repairs regressions introduced by 1.0.29's target verification.
+The recorded destination no longer expires during processing or depends on the
+global latest click. The original window is restored even when another window
+of the same app is frontmost. Electron's documented `AXManualAccessibility`
+opt-in enables field capture where supported; this does not bypass macOS consent.
+
+Failed or unconfirmed delivery retains a transcript on the clipboard unless a
+newer user copy would be overwritten. History and explicit Copy remain available.
+Only confirmed clipboard delivery restores the previous clipboard when that
+setting is enabled. Cancellation suppresses recovery writes as well as insertion.
 
 ## Automated checks
 
@@ -15,8 +22,14 @@ is still saved in History, with a Copy command in the menu bar and floating node
 | Cancelled operation gate | Passed in isolation | `make foundations-smoke` |
 | English/Bulgarian cleanup and preserved phrases | Passed on local Mac | `make text-smoke` |
 | Messages, Chrome, CapCut compatibility routing | Source contract passed | `make insertion-smoke`; not a live paste test |
+| Native editor: same field, different field/window/app | Passed on local Mac | `make live-insertion-smoke`: exact original selection replaced once; other fields unchanged |
+| Point-only editor: newer click, 15-minute-old operation anchor | Passed on local Mac | Production injector + disposable external editor, actual content inspected |
+| Long Bulgarian clipboard delivery to moved window | Passed on local Mac | Production injector + disposable external editor, full content present once |
+| Resized point-only destination | Passed on local Mac | Refused stale coordinates; transcript retained on clipboard |
+| Cancelled delivery, missing destination, newer user copy | Passed on local Mac | Live harness checks destination and pasteboard values |
+| Chrome textarea and contenteditable with focus moved to another field | Passed on local Mac | `--browser-check` + native UI inspection: confirmed; original field updated, other field unchanged |
 
-## Live field checks still required
+## Remaining surface checks
 
 These are not marked as verified merely because Cmd-V was posted or a source
 contract passed. For each surface, dictate into a disposable field, change focus
@@ -24,10 +37,10 @@ while decoding, and confirm both destination and clipboard content afterward.
 
 | Surface | Status | Specific risk |
 | --- | --- | --- |
-| TextEdit / Notes | Not yet live-tested | AX selected-text readback varies by editor |
-| Chrome textarea | Not yet live-tested | Browser focus can change between recording and paste |
-| Chrome rich-text editor / Notion | Not yet live-tested | AX may not expose a readable value; paste can be unverified |
-| Electron apps / Codex | Not yet live-tested | Accessibility element identity may change on rerender |
+| TextEdit / Notes | Specific apps not yet live-tested in this pass | Native AppKit editor fixture passed; app-specific AX behavior may differ |
+| Chrome textarea | Live field-focus test passed | Switching browser tabs/navigation is not covered by that test |
+| Chrome rich-text editor / Notion | Chrome contenteditable passed; Notion not tested | AX may not expose a readable value; paste can be unverified |
+| Electron apps / Codex | Capture opt-in implemented; end-to-end dictation still needs user acceptance | Accessibility element identity may change on rerender |
 | Terminal | Not yet live-tested | Editing state and command line differ from text fields |
 | Messages / Viber / CapCut | Not yet live-tested | Some custom fields only accept clipboard paste |
 
@@ -58,3 +71,24 @@ while decoding, and confirm both destination and clipboard content afterward.
   result is isolated and cannot be inserted, but GPU/CPU work is not yet aborted.
 - Live microphone tests on every third-party app require those apps and field
   states. This checkpoint does not claim universal insertion coverage.
+- Point-only editors lack a durable field identity. Window movement is supported;
+  resized/closed windows are refused rather than clicked at guessed coordinates.
+  Navigation, browser tab replacement, or a destroyed field can require recovery
+  via the clipboard or History. The overlay does not override operating-system
+  restrictions or guarantee delivery to every possible custom editor.
+
+## Required regression gate
+
+Run `make live-insertion-smoke` from an Accessibility-authorized local agent or
+terminal. It opens two disposable native editor processes, uses the actual
+`FocusTracker` and `TextInjector`, and asserts text, selection, duplicate count,
+destination and clipboard behavior (10 cases). It restores the initial clipboard
+and closes its fixtures afterward. CI source-contract checks are supplementary;
+headless runners cannot replace this GUI/permission-dependent test.
+
+For Chrome, serve `scripts/fixtures/insertion.html` locally, open it in a disposable
+native Chrome window, focus a field, then run the compiled test with
+`--browser-check`. Move focus before sending Return to the test process. Inspect
+both fields afterward; it refuses to target a non-test browser window.
+
+Implementation reference: [Electron accessibility](https://github.com/electron/electron/blob/main/docs/tutorial/accessibility.md).

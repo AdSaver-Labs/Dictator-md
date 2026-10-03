@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Dictator-md Disposable Browser Insertion Test</title>
+<style>
+body { font: 18px system-ui; margin: 36px; max-width: 760px; }
+textarea, [contenteditable] { display: block; box-sizing: border-box; width: 100%; min-height: 120px; margin: 12px 0 28px; padding: 16px; border: 1px solid #777; font: inherit; }
+</style>
+<h1>Disposable Browser Insertion Test</h1>
+<label for="original">Original destination</label>
+<textarea id="original">Before AFTER tail</textarea>
+<label for="other">Another field (must stay unchanged)</label>
+<textarea id="other">Other field</textarea>
+<label for="rich">Rich-text destination</label>
+<div id="rich" contenteditable="true" role="textbox" aria-label="Rich-text destination">Rich text before</div>
+</html>

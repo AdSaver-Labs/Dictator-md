@@ -6,6 +6,8 @@ struct InsertionTarget {
     let focusedWindow: AXUIElement?
     let selectedTextRange: CFRange?
     let clickAnchor: ClickAnchor?
+    var windowFrame: CGRect? = nil
+    var fieldFrame: CGRect? = nil
 
     var appName: String? { app?.localizedName }
     var bundleIdentifier: String? { app?.bundleIdentifier }
@@ -28,8 +30,8 @@ final class FocusTracker {
     private(set) var lastTargetApp: NSRunningApplication?
     private var lastClickAnchor: ClickAnchor?
     private var globalMouseMonitor: Any?
-    private let ownBundleID = Bundle.main.bundleIdentifier
-    private let clickAnchorMaxAge: TimeInterval = 2 * 60
+    private let clickAnchorMaxAge: TimeInterval = 10 * 60
+    private var accessibilityEnabledPIDs = Set<pid_t>()
 
     private init() {
         update(from: NSWorkspace.shared.frontmostApplication)
@@ -49,7 +51,7 @@ final class FocusTracker {
 
     func currentTargetApp() -> NSRunningApplication? {
         let frontmost = NSWorkspace.shared.frontmostApplication
-        if frontmost?.bundleIdentifier != ownBundleID {
+        if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             update(from: frontmost)
             return frontmost
         }
@@ -58,6 +60,7 @@ final class FocusTracker {
 
     func currentInsertionTarget() -> InsertionTarget {
         let app = currentTargetApp()
+        if let app { enableWebAccessibility(in: app) }
         let systemFocusedElement = Self.focusedElement().flatMap { element -> AXUIElement? in
             guard let app else { return nil }
             var pid: pid_t = 0
@@ -65,30 +68,50 @@ final class FocusTracker {
                 ? element : nil
         }
         let focusedElement = systemFocusedElement ?? app.flatMap(Self.focusedElement(in:))
+        let window = focusedElement.flatMap(Self.window(from:)) ?? app.flatMap(Self.focusedWindow(in:))
+        let windowFrame = window.flatMap(Self.frame(of:))
+        let fieldFrame = focusedElement.flatMap(Self.frame(of:))
+        let selectedRange = focusedElement.flatMap(Self.selectedTextRange(from:))
+        var anchor = validClickAnchor(for: app).flatMap { anchor -> ClickAnchor? in
+            guard windowFrame?.contains(anchor.screenPoint) == true else { return nil }
+            if let fieldFrame, !fieldFrame.contains(anchor.screenPoint) { return nil }
+            return anchor
+        }
+        if anchor == nil, let app, let fieldFrame, let windowFrame, selectedRange != nil {
+            let point = CGPoint(x: fieldFrame.midX, y: fieldFrame.midY)
+            if windowFrame.contains(point) {
+                anchor = ClickAnchor(app: app, screenPoint: point, capturedAt: Date())
+            }
+        }
         return InsertionTarget(
             app: app,
             focusedElement: focusedElement,
-            focusedWindow: focusedElement.flatMap(Self.window(from:)) ?? app.flatMap(Self.focusedWindow(in:)),
-            selectedTextRange: focusedElement.flatMap(Self.selectedTextRange(from:)),
-            clickAnchor: validClickAnchor(for: app)
+            focusedWindow: window,
+            selectedTextRange: selectedRange,
+            clickAnchor: anchor,
+            windowFrame: windowFrame,
+            fieldFrame: fieldFrame
         )
     }
 
-    func isCurrentClickAnchor(_ anchor: ClickAnchor) -> Bool {
-        guard let current = lastClickAnchor else { return false }
-        return current.app.processIdentifier == anchor.app.processIdentifier
-            && current.capturedAt == anchor.capturedAt
-            && Date().timeIntervalSince(anchor.capturedAt) <= clickAnchorMaxAge
+    private func enableWebAccessibility(in app: NSRunningApplication) {
+        guard AXIsProcessTrusted(), accessibilityEnabledPIDs.insert(app.processIdentifier).inserted else { return }
+        // Electron documents this opt-in; unsupported native apps simply ignore it.
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        let result = AXUIElementSetAttributeValue(element, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        if result == .success {
+            Thread.sleep(forTimeInterval: 0.08)
+            DebugLog.shared.log("[FocusTracker] enabledWebAccessibility pid=\(app.processIdentifier)")
+        }
     }
 
     func recordMouseDown(screenPoint: CGPoint) {
-        guard !Self.isInsideOwnWindow(screenPoint),
-              !Self.isInsideOwnWindow(NSEvent.mouseLocation) else {
+        guard !Self.isInsideOwnWindow(screenPoint) else {
             return
         }
 
         guard let app = NSWorkspace.shared.frontmostApplication,
-              app.bundleIdentifier != ownBundleID,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               !app.isTerminated else {
             return
         }
@@ -100,7 +123,7 @@ final class FocusTracker {
 
     private func update(from app: NSRunningApplication?) {
         guard let app,
-              app.bundleIdentifier != ownBundleID,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               !app.isTerminated else {
             return
         }
@@ -112,7 +135,7 @@ final class FocusTracker {
               let anchor = lastClickAnchor,
               !anchor.app.isTerminated,
               Date().timeIntervalSince(anchor.capturedAt) <= clickAnchorMaxAge,
-              (anchor.app.processIdentifier == app.processIdentifier || anchor.app.bundleIdentifier == app.bundleIdentifier) else {
+              anchor.app.processIdentifier == app.processIdentifier else {
             return nil
         }
         return anchor
@@ -121,15 +144,34 @@ final class FocusTracker {
     private func startMouseTrackingFallback() {
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
             if let cgEvent = event.cgEvent, Self.isSyntheticClick(cgEvent) { return }
-            let point = CGEvent(source: nil)?.location ?? NSEvent.mouseLocation
+            guard let point = event.cgEvent?.location else { return }
             self?.recordMouseDown(screenPoint: point)
         }
     }
 
     private static func isInsideOwnWindow(_ point: CGPoint) -> Bool {
-        NSApp.windows.contains { window in
-            window.isVisible && window.frame.contains(point)
+        // CGEvent and AX use top-left coordinates; AppKit window frames use bottom-left.
+        let appKitPoint = CGPoint(x: point.x, y: (NSScreen.screens.first?.frame.maxY ?? 0) - point.y)
+        return NSApp.windows.contains { window in
+            window.isVisible && window.frame.contains(appKitPoint)
         }
+    }
+
+    static func frame(of element: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionValue, let sizeValue,
+              CFGetTypeID(positionValue) == AXValueGetTypeID(), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
+        let position = positionValue as! AXValue
+        let size = sizeValue as! AXValue
+        guard AXValueGetType(position) == .cgPoint, AXValueGetType(size) == .cgSize else { return nil }
+        var point = CGPoint.zero
+        var dimensions = CGSize.zero
+        guard AXValueGetValue(position, .cgPoint, &point), AXValueGetValue(size, .cgSize, &dimensions),
+              dimensions.width > 0, dimensions.height > 0 else { return nil }
+        return CGRect(origin: point, size: dimensions)
     }
 
     private static func focusedElement() -> AXUIElement? {
