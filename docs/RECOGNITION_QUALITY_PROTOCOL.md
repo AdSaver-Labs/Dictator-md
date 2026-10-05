@@ -19,6 +19,21 @@ window behaviour. No additional model, paid API or network request is required.
 - Glossary cues may select spellings for a recheck but never fuzzy-rewrite text.
 - A medicine or brand glossary is not medical advice or guaranteed recognition.
 
+## Conservative Cleanup
+
+Use NSSpellChecker's automatic correction API, never select a replacement by
+sorting its suggestion list by edit distance. For Bulgarian, an automatic
+replacement may only remove one adjacent duplicated letter from a word and
+must also be approved by the system dictionary. Arbitrary deletions, verb
+changes and specialist-word guesses require a user-confirmed correction.
+All NSSpellChecker access, including its available-language list, belongs on
+the main thread. Missing language support leaves the original text intact.
+
+Specialist spelling sources for the small recognition-only glossary:
+[Bulgarian Drug Agency](https://www.bda.bg/images/stories/documents/new_registered/201910/3.pdf)
+and [Medical University Sofia](https://mu-sofia.bg/wp-content/uploads/2018/08/CMH_2010_2011.pdf).
+These sources establish spelling, not recognition accuracy or medical guidance.
+
 ## Learning
 
 1. History's original recognition identifies whether the ASR or cleanup failed.

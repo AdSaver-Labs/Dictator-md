@@ -61,14 +61,28 @@ final class FocusTracker {
     func currentInsertionTarget() -> InsertionTarget {
         let app = currentTargetApp()
         if let app { enableWebAccessibility(in: app) }
-        let systemFocusedElement = Self.focusedElement().flatMap { element -> AXUIElement? in
-            guard let app else { return nil }
-            var pid: pid_t = 0
-            return AXUIElementGetPid(element, &pid) == .success && pid == app.processIdentifier
-                ? element : nil
+        func captureField() -> AXUIElement? {
+            let systemField = Self.focusedElement().flatMap { element -> AXUIElement? in
+                guard let app else { return nil }
+                var pid: pid_t = 0
+                return AXUIElementGetPid(element, &pid) == .success && pid == app.processIdentifier
+                    ? element : nil
+            }
+            return systemField ?? app.flatMap(Self.focusedElement(in:))
         }
-        let focusedElement = systemFocusedElement ?? app.flatMap(Self.focusedElement(in:))
-        let window = focusedElement.flatMap(Self.window(from:)) ?? app.flatMap(Self.focusedWindow(in:))
+        var focusedElement = captureField()
+        // Electron builds its AX tree asynchronously after the opt-in. Do not
+        // permanently capture a missing editor merely because the first query raced it.
+        if let app, accessibilityEnabledPIDs.contains(app.processIdentifier), focusedElement == nil {
+            let deadline = Date().addingTimeInterval(0.30)
+            repeat {
+                Thread.sleep(forTimeInterval: 0.025)
+                focusedElement = captureField()
+            } while focusedElement == nil && Date() < deadline
+        }
+        // Browser controls can report transient/popup owner windows. The app's
+        // keyboard-focused window is the durable destination to raise later.
+        let window = app.flatMap(Self.focusedWindow(in:)) ?? focusedElement.flatMap(Self.window(from:))
         let windowFrame = window.flatMap(Self.frame(of:))
         let fieldFrame = focusedElement.flatMap(Self.frame(of:))
         let selectedRange = focusedElement.flatMap(Self.selectedTextRange(from:))
@@ -95,11 +109,12 @@ final class FocusTracker {
     }
 
     private func enableWebAccessibility(in app: NSRunningApplication) {
-        guard AXIsProcessTrusted(), accessibilityEnabledPIDs.insert(app.processIdentifier).inserted else { return }
+        guard AXIsProcessTrusted(), !accessibilityEnabledPIDs.contains(app.processIdentifier) else { return }
         // Electron documents this opt-in; unsupported native apps simply ignore it.
         let element = AXUIElementCreateApplication(app.processIdentifier)
         let result = AXUIElementSetAttributeValue(element, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         if result == .success {
+            accessibilityEnabledPIDs.insert(app.processIdentifier)
             Thread.sleep(forTimeInterval: 0.08)
             DebugLog.shared.log("[FocusTracker] enabledWebAccessibility pid=\(app.processIdentifier)")
         }
@@ -220,7 +235,7 @@ final class FocusTracker {
             kAXSelectedTextRangeAttribute as CFString,
             &value
         )
-        guard result == .success, let value else { return nil }
+        guard result == .success, let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         let axValue = value as! AXValue
         guard AXValueGetType(axValue) == .cfRange else {
             return nil

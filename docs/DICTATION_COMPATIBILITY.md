@@ -11,6 +11,14 @@ newer user copy would be overwritten. History and explicit Copy remain available
 Only confirmed clipboard delivery restores the previous clipboard when that
 setting is enabled. Cancellation suppresses recovery writes as well as insertion.
 
+Version 1.0.32 prefers the application's focused window when capturing a
+destination, retries an initially missing Electron field for up to 300 ms,
+and retries unsuccessful AXManualAccessibility opt-ins on subsequent captures.
+Hermes (`com.nousresearch.hermes`) uses clipboard paste so its editor receives
+normal input events. A verified captured field must not be clicked again merely
+because its application prefers clipboard paste. Coordinate clicking remains a
+fallback only when exact field restoration failed or no field was captured.
+
 ## Automated checks
 
 | Surface or behavior | Result | Evidence |
@@ -28,6 +36,8 @@ setting is enabled. Cancellation suppresses recovery writes as well as insertion
 | Resized point-only destination | Passed on local Mac | Refused stale coordinates; transcript retained on clipboard |
 | Cancelled delivery, missing destination, newer user copy | Passed on local Mac | Live harness checks destination and pasteboard values |
 | Chrome textarea and contenteditable with focus moved to another field | Passed on local Mac | `--browser-check` + native UI inspection: confirmed; original field updated, other field unchanged |
+| Chrome address bar | Passed on local Mac in 1.0.32 | `--surface-check chrome --switch-app`: actual field readback, original destination updated once, newer application's editor unchanged |
+| Hermes composer | Passed on local Mac in 1.0.32 | `--surface-check hermes --switch-app`: actual composer readback, no message submitted, newer application's editor unchanged |
 
 ## Remaining surface checks
 
@@ -90,5 +100,14 @@ For Chrome, serve `scripts/fixtures/insertion.html` locally, open it in a dispos
 native Chrome window, focus a field, then run the compiled test with
 `--browser-check`. Move focus before sending Return to the test process. Inspect
 both fields afterward; it refuses to target a non-test browser window.
+
+For the Chrome address bar, open a disposable New Tab window and focus its empty
+address bar. For Hermes, focus an empty Message composer. Run the compiled
+test with `--surface-check chrome --switch-app` or
+`--surface-check hermes --switch-app`, then send Return to the test process.
+The test switches to a disposable external editor, calls the real injector,
+reads the original field and confirms the external editor was not modified.
+It never submits a search or message. Remove the unsent probe afterward.
+These tests prove the tested states, not every popup, navigation or rerender.
 
 Implementation reference: [Electron accessibility](https://github.com/electron/electron/blob/main/docs/tutorial/accessibility.md).

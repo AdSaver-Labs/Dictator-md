@@ -35,6 +35,16 @@ struct TextCorrectorSmoke {
         let personal = PersonalCorrection.validated(heard: "дикло фенак", spelling: "диклофенак", language: .bulgarian, context: "")!
         let personalStandard = corrector.correct("питам за дикло фенак", style: .standard, language: .bulgarian, corrections: [personal])
         let personalRaw = corrector.correct("дикло фенак", style: .raw, language: .bulgarian, corrections: [personal])
+        let scopedVerb = PersonalCorrection.validated(heard: "провари PostgreSQL", spelling: "провери PostgreSQL", language: .bulgarian, context: "Hermes")!
+        let correctedVerb = corrector.correct("После помолих Hermes да провари PostgreSQL.", style: .standard, language: .bulgarian, corrections: [scopedVerb])
+        let untouchedVerb = corrector.correct("После помолих Hermes да провари PostgreSQL.", style: .standard, language: .bulgarian)
+        let cookingVerb = corrector.correct("Помолих Hermes да провари супата.", style: .standard, language: .bulgarian, corrections: [scopedVerb])
+        let specialistRules = [
+            PersonalCorrection.validated(heard: "хидрохлоротиазит", spelling: "хидрохлоротиазид", language: .bulgarian, context: "")!,
+            PersonalCorrection.validated(heard: "иммунохистохимия", spelling: "имунохистохимия", language: .bulgarian, context: "")!,
+            PersonalCorrection.validated(heard: "тото от днеска", spelling: "щото днеска", language: .bulgarian, context: "")!
+        ]
+        let correctedSpecialists = corrector.correct("Хидрохлоротиазит, иммунохистохимия, тото от днеска.", style: .standard, language: .bulgarian, corrections: specialistRules)
         let checks: [(String, () -> Bool)] = [
             ("small prose count", { prose.contains("two ideas") }),
             ("technical number", { version.lowercased().contains("version 2") }),
@@ -58,7 +68,16 @@ struct TextCorrectorSmoke {
             ("hesitation sounds removable", { !cleanedHesitation.lowercased().contains("um ") }),
             ("meaningful Bulgarian phrases preserved", { preservedBulgarianMeaning.lowercased().contains("ами значи") }),
             ("confirmed correction in formatting pipeline", { personalStandard.contains("диклофенак") }),
-            ("raw output remains raw", { personalRaw == "дикло фенак" })
+            ("raw output remains raw", { personalRaw == "дикло фенак" }),
+            ("uncertain Bulgarian verb preserved without approved rule", { untouchedVerb.contains("провари") }),
+            ("confirmed contextual verb survives cleanup", { correctedVerb.contains("провери") }),
+            ("contextual correction leaves unrelated verb usage intact", { cookingVerb.contains("провари супата") }),
+            ("confirmed specialist and slang spellings survive cleanup", { correctedSpecialists.lowercased().contains("хидрохлоротиазид, имунохистохимия, щото днеска") }),
+            ("reject arbitrary Bulgarian letter deletion", { !LocalProofreader.isSafeAutomaticCorrection("повари", for: "провари", language: "bg") }),
+            ("reject Bulgarian semantic guesses", { !LocalProofreader.isSafeAutomaticCorrection("провери", for: "провари", language: "bg") }),
+            ("allow Bulgarian duplicated-letter correction", { LocalProofreader.isSafeAutomaticCorrection("сега", for: "сегаа", language: "bg") }),
+            ("English automatic spelling stays local and narrow", { LocalProofreader.isSafeAutomaticCorrection("spelling", for: "speling", language: "en") && !LocalProofreader.isSafeAutomaticCorrection("spelling", for: "speallingg", language: "en") }),
+            ("automatic spelling does not cross scripts", { !LocalProofreader.isSafeAutomaticCorrection("повари", for: "povari", language: "en") })
         ]
 
         let failed = checks.compactMap { name, check in check() ? nil : name }

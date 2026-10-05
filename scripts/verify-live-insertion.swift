@@ -19,7 +19,9 @@ struct LiveInsertionTest {
             }
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    if CommandLine.arguments.contains("--browser-check") {
+                    if CommandLine.arguments.contains("--surface-check") {
+                        try runSurfaceCheck()
+                    } else if CommandLine.arguments.contains("--browser-check") {
                         try runBrowserCheck()
                     } else {
                         try runTests()
@@ -32,6 +34,80 @@ struct LiveInsertionTest {
             }
             app.run()
         }
+    }
+
+    static func runSurfaceCheck() throws {
+        let hermes = CommandLine.arguments.contains("hermes")
+        let bundle = hermes ? "com.nousresearch.hermes" : "com.google.Chrome"
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundle }) else {
+            throw Failure("The requested test application is not running")
+        }
+        app.activate()
+        let activationDeadline = Date().addingTimeInterval(1.25)
+        while NSWorkspace.shared.frontmostApplication?.processIdentifier != app.processIdentifier && Date() < activationDeadline {
+            Thread.sleep(forTimeInterval: 0.025)
+        }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
+            throw Failure("The test application could not become frontmost")
+        }
+        var captured: InsertionTarget?
+        DispatchQueue.main.sync { captured = FocusTracker.shared.currentInsertionTarget() }
+        guard let target = captured, let field = target.focusedElement else {
+            throw Failure("No field was captured")
+        }
+        func attribute(_ name: String, of element: AXUIElement = field) -> String? {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
+            return value as? String
+        }
+        let before = (attribute(kAXValueAttribute) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let role = attribute(kAXRoleAttribute)
+        let description = attribute(kAXDescriptionAttribute) ?? ""
+        let title = target.focusedWindow.flatMap { attribute(kAXTitleAttribute, of: $0) } ?? ""
+        if hermes {
+            guard role == kAXTextAreaRole, description == "Message",
+                  ["", "What should we tackle?", "Add more context"].contains(before) else {
+                throw Failure("Refusing to modify a non-empty/non-composer Hermes field")
+            }
+        } else {
+            guard role == kAXTextFieldRole, description == "Address and search bar",
+                  title.lowercased().contains("new tab"),
+                  ["", "dictatormd-disposable-probe"].contains(before) else {
+                throw Failure("Refusing to modify anything but an empty New Tab address bar")
+            }
+        }
+        let clipboard = PasteboardSnapshot(pasteboard: .general)
+        defer { clipboard.restoreIfUnchanged(expectedChangeCount: NSPasteboard.general.changeCount, after: 0) }
+        print("Captured \(bundle) role=\(role ?? "nil") window=\(target.focusedWindow != nil) anchor=\(target.clickAnchor != nil). Move focus elsewhere, then send Return to the test process. No message will be submitted.")
+        fflush(stdout)
+        _ = readLine()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("dictatormd-surface-\(UUID())")
+        var processes: [Process] = []
+        var other: FixtureClient?
+        defer {
+            for process in processes where process.isRunning { process.terminate() }
+            try? FileManager.default.removeItem(at: root)
+        }
+        if CommandLine.arguments.contains("--switch-app") {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            other = try launchFixture(at: root, processes: &processes)
+            _ = try other!.command("focusOriginal")
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == other!.pid else {
+                throw Failure("External fixture did not acquire real foreground focus")
+            }
+        }
+        let probe = "Dictator surface check Sofia Благоевград 123"
+        let outcome = TextInjector().insert(text: probe, target: target)
+        let delivered = attribute(kAXValueAttribute) ?? ""
+        guard outcome.wasSent, delivered.contains(probe), delivered.components(separatedBy: probe).count == 2 else {
+            throw Failure("\(bundle) actual delivery failed: outcome=\(outcome) window=\(target.focusedWindow != nil) anchor=\(target.clickAnchor != nil)")
+        }
+        if let other, try other.command("snapshot")["original"] != "Before AFTER tail" {
+            throw Failure("The transcript went into the newer application's field")
+        }
+        print("PASS \(bundle): actual original field contains probe exactly once (\(outcome)). Remove the disposable probe before continuing.")
+        fflush(stdout)
+        Thread.sleep(forTimeInterval: 2.5)
     }
 
     static func runBrowserCheck() throws {
@@ -56,8 +132,14 @@ struct LiveInsertionTest {
         _ = readLine()
         let text = "Browser delivery check: Sofia, Благоевград, 123"
         let outcome = TextInjector().insert(text: text, target: target)
-        guard outcome.wasSent else { throw Failure("browser insertion failed") }
-        print("Browser insertion result: \(outcome). Verify the original field contains: \(text)")
+        var delivered: CFTypeRef?
+        guard outcome == .confirmed, let field = target.focusedElement,
+              AXUIElementCopyAttributeValue(field, kAXValueAttribute as CFString, &delivered) == .success,
+              let value = delivered as? String, value.contains(text),
+              value.components(separatedBy: text).count == 2 else {
+            throw Failure("browser insertion failed actual original-field readback")
+        }
+        print("PASS browser original-field readback: \(outcome), probe appears exactly once. Verify the other field is unchanged.")
         fflush(stdout)
         // Keep the main loop alive for production clipboard restoration.
         Thread.sleep(forTimeInterval: 2.5)

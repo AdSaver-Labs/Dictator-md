@@ -9,9 +9,8 @@ final class LocalProofreader: @unchecked Sendable {
     private init() {}
 
     func proofread(_ text: String, language: AppSettings.DictationLanguage, protectedTerms: [String]) -> String {
-        guard let spellLanguage = spellLanguage(for: text, requestedLanguage: language) else { return text }
-
         let work = {
+            guard let spellLanguage = self.spellLanguage(for: text, requestedLanguage: language) else { return text }
             let checker = NSSpellChecker.shared
             let protectedWords = Set(protectedTerms.map { $0.lowercased() })
             let pattern = #"\b[\p{L}][\p{L}'-]{2,}\b"#
@@ -39,14 +38,13 @@ final class LocalProofreader: @unchecked Sendable {
                 )
                 let wordRange = NSRange(location: 0, length: (word as NSString).length)
                 guard misspelling.location == 0, misspelling.length == wordRange.length,
-                      let suggestions = checker.guesses(
+                      let suggestion = checker.correction(
                         forWordRange: wordRange,
                         in: word,
                         language: spellLanguage,
                         inSpellDocumentWithTag: 0
                       ),
-                      let suggestion = self.bestSuggestion(from: suggestions, for: word),
-                      self.shouldApply(suggestion: suggestion, to: word) else {
+                      Self.isSafeAutomaticCorrection(suggestion, for: word, language: spellLanguage) else {
                     continue
                 }
                 result.replaceSubrange(range, with: self.preserveCapitalization(of: word, in: suggestion))
@@ -94,31 +92,36 @@ final class LocalProofreader: @unchecked Sendable {
         return word == word.lowercased() || word == word.capitalized
     }
 
-    private func shouldApply(suggestion: String, to word: String) -> Bool {
+    static func isSafeAutomaticCorrection(_ suggestion: String, for word: String, language: String) -> Bool {
         guard !suggestion.isEmpty,
               suggestion.lowercased() != word.lowercased(),
-              suggestion.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
+              suggestion.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+              suggestion.allSatisfy(\.isLetter), word.allSatisfy(\.isLetter) else {
             return false
         }
-        return editDistance(word.lowercased(), suggestion.lowercased()) <= 2
-    }
-
-    private func bestSuggestion(from suggestions: [String], for word: String) -> String? {
-        suggestions
-            .filter { shouldApply(suggestion: $0, to: word) }
-            .min { left, right in
-                let leftDistance = editDistance(word.lowercased(), left.lowercased())
-                let rightDistance = editDistance(word.lowercased(), right.lowercased())
-                if leftDistance != rightDistance { return leftDistance < rightDistance }
-                return left.count < right.count
+        if language.lowercased().hasPrefix("bg") {
+            // A nearby dictionary word is not evidence of the intended Bulgarian
+            // verb/name. Allow only a system-approved duplicated-letter removal;
+            // semantic substitutions belong to explicit personal corrections.
+            let source = Array(word.lowercased())
+            let target = Array(suggestion.lowercased())
+            guard source.count == target.count + 1 else { return false }
+            for index in source.indices where index > 0 && source[index] == source[index - 1] {
+                var candidate = source
+                candidate.remove(at: index)
+                if candidate == target { return true }
             }
+            return false
+        }
+        guard !RecognitionVocabulary.containsCyrillic(suggestion) else { return false }
+        return editDistance(word.lowercased(), suggestion.lowercased()) <= 1
     }
 
     private func preserveCapitalization(of original: String, in suggestion: String) -> String {
         original.first?.isUppercase == true ? suggestion.capitalized : suggestion
     }
 
-    private func editDistance(_ source: String, _ target: String) -> Int {
+    private static func editDistance(_ source: String, _ target: String) -> Int {
         let sourceChars = Array(source)
         let targetChars = Array(target)
         var previous = Array(0...targetChars.count)

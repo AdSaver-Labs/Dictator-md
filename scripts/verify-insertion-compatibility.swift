@@ -7,7 +7,8 @@ let source = try String(contentsOf: sourceURL, encoding: .utf8)
 let requiredCompatibilityBundles = [
     "com.apple.MobileSMS",
     "com.google.Chrome",
-    "com.lemon.lvoverseas"
+    "com.lemon.lvoverseas",
+    "com.nousresearch.hermes"
 ]
 
 let missing = requiredCompatibilityBundles.filter { !source.contains("\"\($0)\"") }
@@ -18,4 +19,4 @@ guard missing.isEmpty,
     exit(1)
 }
 
-print("Insertion compatibility contract passed for Messages, Chrome, and CapCut.")
+print("Insertion compatibility contract passed for Messages, Chrome, CapCut, and Hermes.")

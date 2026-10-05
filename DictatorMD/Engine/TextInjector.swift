@@ -253,6 +253,7 @@ final class TextInjector {
     private func requiresClipboardPaste(_ target: InsertionTarget?) -> Bool {
         switch target?.bundleIdentifier {
         case "com.viber.osx",
+             "com.nousresearch.hermes",
              "com.apple.MobileSMS",
              "com.lemon.lvoverseas",
              "com.google.Chrome",
@@ -277,7 +278,10 @@ final class TextInjector {
               target.clickAnchor != nil else {
             return false
         }
-        return target.focusedElement == nil || requiresClipboardPaste(target) || !verifyTargetFocus(target)
+        // A clipboard-compatible editor still does not need a click if its
+        // exact captured field already has keyboard focus. Clicking can open a
+        // browser popup, collapse a selection or move the caret unnecessarily.
+        return target.focusedElement == nil || !verifyTargetFocus(target)
     }
 
     private var shouldRestoreClipboardAfterDictation: Bool {
