@@ -14,14 +14,17 @@ final class TextCorrector: @unchecked Sendable {
         _ text: String,
         prosody: ProsodyFeatures? = nil,
         style: AppSettings.OutputStyle? = nil,
-        language: AppSettings.DictationLanguage? = nil
+        language: AppSettings.DictationLanguage? = nil,
+        corrections: [PersonalCorrection] = []
     ) -> String {
         let effectiveStyle = style ?? AppSettings.shared.outputStyle
         if effectiveStyle == .raw { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
-        guard AppSettings.shared.grammarCorrectionEnabled else { return text }
+        let effectiveLanguage = language ?? AppSettings.shared.dictationLanguage
+        let confirmedText = PersonalCorrection.apply(corrections, to: text, language: effectiveLanguage)
+        guard AppSettings.shared.grammarCorrectionEnabled else { return confirmedText }
         let startTime = CFAbsoluteTimeGetCurrent()
 
-        var result = text
+        var result = confirmedText
         if language == .bulgarian || isBulgarianText(result) {
             result = BulgarianTextCorrector.correct(result)
         }
@@ -37,7 +40,7 @@ final class TextCorrector: @unchecked Sendable {
             result = LocalProofreader.shared.proofread(
                 result,
                 language: language ?? AppSettings.shared.dictationLanguage,
-                protectedTerms: AppSettings.shared.customTerms
+                protectedTerms: AppSettings.shared.customTerms + corrections.map(\.spelling)
             )
         }
         result = fixAcronymsAndTerms(result)
@@ -50,6 +53,7 @@ final class TextCorrector: @unchecked Sendable {
             result = applyIntonationFormatting(result, prosody: prosody)
         }
         result = fixPunctuation(result)
+        result = PersonalCorrection.apply(corrections, to: result, language: effectiveLanguage)
 
         let elapsed = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
         // Do not write dictated content to the console. Performance telemetry is

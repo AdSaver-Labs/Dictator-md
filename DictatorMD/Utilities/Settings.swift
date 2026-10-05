@@ -111,6 +111,8 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         case previewBeforeInsert
         case escapeToCancelEnabled
         case streamingPreviewEnabled
+        case personalCorrectionsEnabled
+        case recognitionRecheckEnabled
     }
 
     // MARK: - Properties
@@ -159,7 +161,8 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     var vocabularyPrompt: String {
         get {
-            defaults.string(forKey: Key.vocabularyPrompt.rawValue) ?? Self.defaultVocabularyPrompt
+            let stored = defaults.string(forKey: Key.vocabularyPrompt.rawValue)
+            return stored == Self.legacyDefaultVocabularyPrompt ? Self.defaultVocabularyPrompt : (stored ?? Self.defaultVocabularyPrompt)
         }
         set { defaults.set(newValue, forKey: Key.vocabularyPrompt.rawValue); objectWillChange.send() }
     }
@@ -252,6 +255,16 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
         set { defaults.set(newValue, forKey: Key.streamingPreviewEnabled.rawValue); objectWillChange.send() }
     }
 
+    var personalCorrectionsEnabled: Bool {
+        get { defaults.object(forKey: Key.personalCorrectionsEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.personalCorrectionsEnabled.rawValue); objectWillChange.send() }
+    }
+
+    var recognitionRecheckEnabled: Bool {
+        get { defaults.object(forKey: Key.recognitionRecheckEnabled.rawValue) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.recognitionRecheckEnabled.rawValue); objectWillChange.send() }
+    }
+
     func effectiveOutputStyle(for bundleIdentifier: String?) -> OutputStyle {
         guard applicationProfilesEnabled, let bundleIdentifier else { return outputStyle }
         let lower = bundleIdentifier.lowercased()
@@ -302,8 +315,14 @@ final class AppSettings: ObservableObject, @unchecked Sendable {
 
     // MARK: - Default Vocabulary Prompt
 
-    // ~500 words — under whisper's 1024 token (~750 word) limit
+    // A glossary, not instructions. RecognitionVocabulary applies the loaded tokenizer's budget.
     static let defaultVocabularyPrompt = """
+        Openclaw, Hermes, Codex, ChatGPT, Notion, GitHub, API, JSON, JavaScript, TypeScript, Python, SwiftUI,
+        PostgreSQL, Kubernetes, Docker, React, Next.js, Terraform, OAuth, CI/CD, backend, frontend
+        """
+
+    // Kept only to recognize and migrate an unchanged saved default. Custom edits are preserved.
+    private static let legacyDefaultVocabularyPrompt = """
         Dictation should preserve the speaker's language. If the user speaks Bulgarian, output Bulgarian Cyrillic text.
         Bulgarian dictation may include casual Sofia/business slang and mixed tech English: шорткът, хоткий, промпт,
         агент, агенти, ап, апликация, сетинги, модел, локално, клауд, бекенд, фронтенд, деплой, репо, гит,

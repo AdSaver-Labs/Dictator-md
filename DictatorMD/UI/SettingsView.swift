@@ -3338,6 +3338,7 @@ private struct HistoryRow: View {
     let item: DictationHistoryItem
     let colorScheme: ColorScheme
     @State private var isExpanded = false
+    @State private var isTeachingCorrection = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -3357,6 +3358,13 @@ private struct HistoryRow: View {
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
                 Button {
+                    isTeachingCorrection = true
+                } label: {
+                    Image(systemName: "pencil.and.list.clipboard")
+                }
+                .buttonStyle(.plain)
+                .help("Save a spelling correction")
+                Button {
                     withAnimation(.easeInOut(duration: 0.16)) {
                         isExpanded.toggle()
                     }
@@ -3373,6 +3381,15 @@ private struct HistoryRow: View {
                 colorScheme: colorScheme
             )
             .frame(height: isExpanded ? expandedTextHeight : 52)
+            if isExpanded, let raw = item.rawText, raw != item.text {
+                DisclosureGroup("Original Recognition") {
+                    Text(raw)
+                        .font(.system(size: 12))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3381,6 +3398,29 @@ private struct HistoryRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(colorScheme == .dark ? Color.black.opacity(0.18) : Color.black.opacity(0.035))
         )
+        .sheet(isPresented: $isTeachingCorrection) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Save a Correction").font(.headline)
+                    Spacer()
+                    Button { isTeachingCorrection = false } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.plain)
+                        .help("Close")
+                }
+                ScrollView {
+                    Text(item.rawText ?? item.text)
+                        .font(.system(size: 13))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 140)
+                PersonalCorrectionEditor(language: item.language == "Bulgarian" ? .bulgarian : .english) {
+                    isTeachingCorrection = false
+                }
+            }
+            .padding(24)
+            .frame(width: 500)
+        }
     }
 
     private static let formatter: DateFormatter = {
@@ -3456,6 +3496,7 @@ private struct VocabularySection: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            PersonalCorrectionsSection(settings: settings, colorScheme: colorScheme)
             // Names & Terms
             SettingsCard(colorScheme: colorScheme) {
                 CardHeader("Names & Terms", subtitle: "Add names of people, places, and terms you use often")
@@ -3490,6 +3531,98 @@ private struct VocabularySection: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
+            }
+        }
+    }
+}
+
+private struct PersonalCorrectionsSection: View {
+    @ObservedObject var settings: AppSettings
+    @ObservedObject private var corrections = PersonalCorrections.shared
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        SettingsCard(colorScheme: colorScheme) {
+            CardHeader("Confirmed Corrections")
+            Toggle("Use saved corrections", isOn: $settings.personalCorrectionsEnabled)
+            Toggle("Recheck uncertain passages", isOn: $settings.recognitionRecheckEnabled)
+            PersonalCorrectionEditor()
+            if !corrections.items.isEmpty {
+                Divider()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(corrections.items) { correction in
+                            HStack(alignment: .top, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(correction.heard + " → " + correction.spelling)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .textSelection(.enabled)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Text((correction.language == "auto" ? "Both languages" : correction.language.uppercased())
+                                         + (correction.context.isEmpty ? "" : " · " + correction.context))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                                Button { corrections.remove(correction) } label: { Image(systemName: "trash") }
+                                    .buttonStyle(.plain)
+                                    .help("Delete correction")
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 220)
+            }
+        }
+    }
+}
+
+private struct PersonalCorrectionEditor: View {
+    @ObservedObject private var corrections = PersonalCorrections.shared
+    @State private var heard = ""
+    @State private var spelling = ""
+    @State private var context = ""
+    @State private var language: AppSettings.DictationLanguage
+    let onSave: () -> Void
+
+    init(language: AppSettings.DictationLanguage = .auto, onSave: @escaping () -> Void = {}) {
+        _language = State(initialValue: language)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField("Recognized phrase", text: $heard)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Recognized phrase")
+            TextField("Correct spelling", text: $spelling)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Correct spelling")
+            TextField("Context (optional)", text: $context)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Picker("Language", selection: $language) {
+                    Text("Both languages").tag(AppSettings.DictationLanguage.auto)
+                    Text("English").tag(AppSettings.DictationLanguage.english)
+                    Text("Bulgarian").tag(AppSettings.DictationLanguage.bulgarian)
+                }
+                .frame(maxWidth: 230)
+                Spacer(minLength: 8)
+                Button("Save Correction") {
+                    if corrections.confirm(heard: heard, spelling: spelling, language: language, context: context) {
+                        heard = ""
+                        spelling = ""
+                        context = ""
+                        onSave()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.logoYellow)
+                .disabled(PersonalCorrection.validated(heard: heard, spelling: spelling, language: language, context: context) == nil)
+            }
+            if let error = corrections.error {
+                Text(error).font(.system(size: 12)).foregroundStyle(.red)
             }
         }
     }
@@ -3661,7 +3794,11 @@ private struct ProtocolsSection: View {
                 ProtocolChecklist(items: [
                     "Every successful dictation is stored locally in memory.json with text, language, target app, duration, timestamp, and word count.",
                     "The learner extracts probable personal terms: Bulgarian/Cyrillic words, names, acronym-shaped words, hyphenated terms, digits, and technical tokens.",
-                    "Learned terms are counted and ranked by frequency and recency, then fed back into future Whisper prompts as local biasing context.",
+                    "Observed terms are suggestions, not verified corrections. Only an explicit Save Correction creates an exact phrase replacement in corrections.json.",
+                    "Confirmed corrections support optional context and English/Bulgarian scope. They do not cascade, replace substrings, or change numbers. Raw mode bypasses replacements.",
+                    "Recognition hints use the loaded tokenizer and stay below 224 tokens. Manual vocabulary and confirmed spellings outrank observed terms; Auto includes Bulgarian hints.",
+                    "A bounded recheck uses the existing model for at most two uncertain short segments, with a confidence margin and numeric/repetition guards. It never repeats the complete recording.",
+                    "History retains original recognition alongside formatted text when they differ, without saving audio. Clearing History clears both versions.",
                     "Manual vocabulary always remains user-controlled and higher confidence than automatically learned terms.",
                     "Language profiles must not poison each other: English prompt terms avoid Cyrillic; Bulgarian can use Cyrillic and repeated local terms.",
                     "The learner must stay offline and lightweight. It can process local text/statistics, but must not require cloud APIs.",

@@ -11,6 +11,7 @@ struct DictationHistoryItem: Identifiable, Codable, Equatable {
     let audioDuration: Double
     let wordCount: Int
     let cleanupCutCount: Int?
+    var rawText: String? = nil
 }
 
 struct DictationStatsEntry: Identifiable, Codable, Equatable {
@@ -87,7 +88,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
         load()
     }
 
-    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double, cleanupCutCount: Int = 0) {
+    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double, cleanupCutCount: Int = 0, rawText: String? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
@@ -100,7 +101,8 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             bundleIdentifier: targetApp?.bundleIdentifier ?? "",
             audioDuration: audioDuration,
             wordCount: Self.wordCount(in: trimmed),
-            cleanupCutCount: cleanupCutCount
+            cleanupCutCount: cleanupCutCount,
+            rawText: rawText == trimmed ? nil : rawText
         )
         let statsEntry = DictationStatsEntry(historyItem: item)
 
@@ -145,19 +147,7 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
     }
 
     func topPromptTerms(for language: AppSettings.DictationLanguage, limit: Int = 80) -> [String] {
-        Array(learnedTerms
-            .filter { term in
-                guard !Self.containsRussianOnlyCyrillic(term.term) else { return false }
-
-                switch language {
-                case .english, .auto:
-                    return !Self.containsCyrillic(term.term) && term.count >= 2
-                case .bulgarian:
-                    return term.count >= 2 || Self.containsCyrillic(term.term)
-                }
-            }
-            .prefix(limit)
-            .map(\.term))
+        RecognitionVocabulary.learnedHints(learnedTerms, language: language, limit: limit)
     }
 
     func promoteToCustomTerm(_ term: String) {

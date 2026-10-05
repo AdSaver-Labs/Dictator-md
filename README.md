@@ -239,6 +239,24 @@ Or download directly from the Settings > Model tab in the app.
 
 ## Grammar Correction
 
+### Local Personal Corrections
+
+In **Vocabulary > Confirmed Corrections**, save the phrase the recognizer wrote
+and its intended spelling, optionally scoped to English, Bulgarian and a context
+phrase. The pencil button in History opens the same editor. Expanded history
+shows original recognition when cleanup changed it.
+
+Confirmed corrections are stored only on the device. They use exact phrase
+matching, not fuzzy guesses, and do not alter numbers. Raw output bypasses these
+replacements. Delete a rule or disable saved corrections in Vocabulary to undo
+personalization. This does not train the acoustic model.
+
+Recognition hints are now packed using the loaded tokenizer's real context
+limit, including Bulgarian hints in Auto mode. A bounded uncertain-segment
+recheck uses the same installed model and can be disabled in Vocabulary. No new
+model download, paid API or audio upload is needed. Recognition remains fallible;
+see [the quality protocol](docs/RECOGNITION_QUALITY_PROTOCOL.md) for verification.
+
 Dictator-md automatically cleans up Whisper's raw output with a local, rule-based corrector (<5ms overhead):
 
 **Capitalization**

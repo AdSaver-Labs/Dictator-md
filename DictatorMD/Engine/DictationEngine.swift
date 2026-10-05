@@ -40,6 +40,7 @@ final class DictationEngine {
     private var pendingPreviewLanguage: AppSettings.DictationLanguage?
     private var pendingPreviewAudioDuration: Double = 0
     private var pendingPreviewCleanupCutCount: Int = 0
+    private var pendingPreviewRawText: String?
     private var operationID = UUID()
     private var operationGate = DictationOperationGate()
     private var escapeMonitor: Any?
@@ -423,6 +424,7 @@ final class DictationEngine {
         let language = pendingPreviewLanguage ?? AppSettings.shared.dictationLanguage
         let audioDuration = pendingPreviewAudioDuration
         let cleanupCutCount = pendingPreviewCleanupCutCount
+        let rawText = pendingPreviewRawText
         let gate = operationGate
         let currentOperationID = operationID
         state = .typing
@@ -433,7 +435,8 @@ final class DictationEngine {
             language: language,
             targetApp: target?.app,
             audioDuration: audioDuration,
-            cleanupCutCount: cleanupCutCount
+            cleanupCutCount: cleanupCutCount,
+            rawText: rawText
         )
         let injector = textInjector
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -478,6 +481,7 @@ final class DictationEngine {
         pendingPreviewLanguage = nil
         pendingPreviewAudioDuration = 0
         pendingPreviewCleanupCutCount = 0
+        pendingPreviewRawText = nil
     }
 
     private func installEscapeMonitor() {
@@ -534,26 +538,16 @@ final class DictationEngine {
         let basePrompt = AppSettings.shared.vocabularyPrompt
         let customTerms = AppSettings.shared.customTerms
         let learnedTerms = DictationMemory.shared.topPromptTerms(for: language)
+        let corrections = AppSettings.shared.personalCorrectionsEnabled ? PersonalCorrections.shared.items : []
+        let recognitionRecheckEnabled = AppSettings.shared.recognitionRecheckEnabled
         let voiceEnergy = Self.voiceEnergy(audioBuffer)
         let prosody = AppSettings.shared.intonationFormattingEnabled ? ProsodyAnalyzer.analyze(audioBuffer) : nil
         if let prosody {
             DebugLog.shared.log("[DictationEngine] prosody \(prosody.debugSummary)")
         }
-        let prompt: String
-        let allPromptTerms = Array((customTerms + learnedTerms).reduce(into: [String]()) { result, term in
-            if !result.contains(where: { $0.caseInsensitiveCompare(term) == .orderedSame }) {
-                result.append(term)
-            }
-        })
-        if allPromptTerms.isEmpty {
-            prompt = basePrompt
-        } else {
-            // Cap custom terms to stay under whisper's ~1024 token (~750 word) limit
-            let baseWordCount = basePrompt.split(separator: " ").count
-            let budget = max(0, 700 - baseWordCount)
-            let termsToAdd = Array(allPromptTerms.prefix(budget))
-            prompt = termsToAdd.isEmpty ? basePrompt : basePrompt + ", Learned user terms: " + termsToAdd.joined(separator: ", ")
-        }
+        let vocabulary = RecognitionVocabulary.Context(customTerms: customTerms,
+            confirmedCorrections: corrections,
+            learnedTerms: learnedTerms, basePrompt: basePrompt)
         let injector = self.textInjector
         let feedback = self.soundFeedback
         let target = self.insertionTarget
@@ -578,7 +572,8 @@ final class DictationEngine {
             var transcription = bridge.transcribe(
                 audioBuffer: audioBuffer,
                 language: language,
-                prompt: prompt,
+                vocabulary: vocabulary,
+                recheckUncertainSegments: recognitionRecheckEnabled,
                 onSegment: AppSettings.shared.streamingPreviewEnabled ? { [weak self] segment in
                     Task { @MainActor in
                         guard let self, gate.isActive, self.operationID == currentOperationID else { return }
@@ -597,7 +592,8 @@ final class DictationEngine {
                         audioBuffer: audioBuffer,
                         language: transcription.language,
                         useVAD: false,
-                        prompt: prompt
+                        vocabulary: vocabulary,
+                        recheckUncertainSegments: recognitionRecheckEnabled
                     )
                 } else {
                     DebugLog.shared.log("[DictationEngine] skipRetryLowEnergy audioDuration=\(String(format: "%.2f", audioDuration)) rms=\(String(format: "%.5f", voiceEnergy.rms)) peak=\(String(format: "%.5f", voiceEnergy.peak))")
@@ -611,14 +607,15 @@ final class DictationEngine {
                     audioBuffer: audioBuffer,
                     language: fallbackLanguage,
                     useVAD: false,
-                    prompt: prompt
+                    vocabulary: vocabulary,
+                    recheckUncertainSegments: recognitionRecheckEnabled
                 )
             }
 
             let detectedLanguage = transcription.language
             let rawText = transcription.text
             let outputStyle = AppSettings.shared.effectiveOutputStyle(for: target?.bundleIdentifier)
-            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle, language: detectedLanguage)
+            let correctedText = TextCorrector.shared.correct(rawText, prosody: prosody, style: outputStyle, language: detectedLanguage, corrections: corrections)
             let fullText = Self.guardLanguageOutput(correctedText, language: detectedLanguage)
             let cleanupCutCount = DictationMemory.estimatedCleanupCutCount(raw: rawText, final: fullText)
             DebugLog.shared.log("[DictationEngine] finalText length=\(fullText.count)")
@@ -639,6 +636,7 @@ final class DictationEngine {
                         self.pendingPreviewLanguage = detectedLanguage
                         self.pendingPreviewAudioDuration = audioDuration
                         self.pendingPreviewCleanupCutCount = cleanupCutCount
+                        self.pendingPreviewRawText = rawText
                         self.state = .preview
                         if AppSettings.shared.floatingNodeEnabled {
                             FloatingNodeController.shared.setPresentation(.preview)
@@ -656,7 +654,8 @@ final class DictationEngine {
                         language: detectedLanguage,
                         targetApp: targetApp,
                         audioDuration: audioDuration,
-                        cleanupCutCount: cleanupCutCount
+                        cleanupCutCount: cleanupCutCount,
+                        rawText: rawText
                     )
                 }
                 guard gate.isActive else { return }

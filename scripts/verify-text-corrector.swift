@@ -32,6 +32,9 @@ struct TextCorrectorSmoke {
         let preservedMeaning = corrector.correct("I mean you know this matters", style: .polished, language: .english)
         let cleanedHesitation = corrector.correct("Um this matters", style: .polished, language: .english)
         let preservedBulgarianMeaning = corrector.correct("Ами значи това е важно", style: .polished, language: .bulgarian)
+        let personal = PersonalCorrection.validated(heard: "дикло фенак", spelling: "диклофенак", language: .bulgarian, context: "")!
+        let personalStandard = corrector.correct("питам за дикло фенак", style: .standard, language: .bulgarian, corrections: [personal])
+        let personalRaw = corrector.correct("дикло фенак", style: .raw, language: .bulgarian, corrections: [personal])
         let checks: [(String, () -> Bool)] = [
             ("small prose count", { prose.contains("two ideas") }),
             ("technical number", { version.lowercased().contains("version 2") }),
@@ -53,7 +56,9 @@ struct TextCorrectorSmoke {
             ("English text unchanged", { englishControl.contains("Blagoevgrad") }),
             ("meaningful English phrases preserved", { preservedMeaning.lowercased().contains("i mean you know") }),
             ("hesitation sounds removable", { !cleanedHesitation.lowercased().contains("um ") }),
-            ("meaningful Bulgarian phrases preserved", { preservedBulgarianMeaning.lowercased().contains("ами значи") })
+            ("meaningful Bulgarian phrases preserved", { preservedBulgarianMeaning.lowercased().contains("ами значи") }),
+            ("confirmed correction in formatting pipeline", { personalStandard.contains("диклофенак") }),
+            ("raw output remains raw", { personalRaw == "дикло фенак" })
         ]
 
         let failed = checks.compactMap { name, check in check() ? nil : name }

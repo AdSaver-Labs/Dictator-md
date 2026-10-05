@@ -13,6 +13,7 @@ Before making changes, read:
 5. `docs/WINDOWS_MANUAL_TESTING.md` - Windows tester checklist.
 6. `docs/mobile/MOBILE_EXECUTION_PLAN.md` - mobile platform strategy.
 7. `docs/PLATFORM_READINESS_BLUEPRINT.md` - current cross-platform audit and release gates.
+8. `docs/RECOGNITION_QUALITY_PROTOCOL.md` - local vocabulary, correction and ASR verification rules.
 
 ## Project Purpose
 

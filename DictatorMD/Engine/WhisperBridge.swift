@@ -102,6 +102,8 @@ final class WhisperBridge: @unchecked Sendable {
         language: AppSettings.DictationLanguage = .auto,
         useVAD: Bool = true,
         prompt: String = "",
+        vocabulary: RecognitionVocabulary.Context? = nil,
+        recheckUncertainSegments: Bool = true,
         onSegment: ((String) -> Void)? = nil
     ) -> Transcription {
         queue.sync {
@@ -131,7 +133,9 @@ final class WhisperBridge: @unchecked Sendable {
                 context: context,
                 threadCount: threadCount
             )
-            let decodePrompt = Self.decodePrompt(prompt, for: effectiveLanguage)
+            let hintContext = vocabulary ?? RecognitionVocabulary.Context(basePrompt: prompt)
+            let decodePrompt = recognitionPrompt(hintContext, language: effectiveLanguage)
+            DebugLog.shared.log("[WhisperBridge] vocabularyTokens=\(tokenCount(decodePrompt)) budget=216")
 
             // Allocate C strings (freed in defer)
             let langCStr = strdup(effectiveLanguage.whisperCode)
@@ -167,6 +171,7 @@ final class WhisperBridge: @unchecked Sendable {
 
             // Vocabulary prompt
             params.initial_prompt = promptCStr.map { UnsafePointer($0) }
+            params.n_max_text_ctx = Int32(min(224, Int(whisper_n_text_ctx(context)) / 2))
 
             // Streaming callback setup
             var callbackCtxPtr: Unmanaged<SegmentCallbackContext>?
@@ -202,19 +207,116 @@ final class WhisperBridge: @unchecked Sendable {
                 return Transcription(text: "", language: effectiveLanguage)
             }
 
-            // Collect full transcription (callback already typed segments incrementally)
+            // Copy segment data before another whisper_full call overwrites the context.
             let segmentCount = whisper_full_n_segments(context)
-            var transcription = ""
+            var segments: [RecognizedSegment] = []
             for i in 0..<segmentCount {
                 if let text = whisper_full_get_segment_text(context, i) {
-                    transcription += String(cString: text)
+                    segments.append(RecognizedSegment(text: String(cString: text),
+                        start: max(0, Double(whisper_full_get_segment_t0(context, i)) / 100),
+                        end: min(audioDuration, Double(whisper_full_get_segment_t1(context, i)) / 100),
+                        score: meanLogProbability(segment: i)))
                 }
             }
+            if recheckUncertainSegments {
+                var rechecks = 0
+                var recheckedSeconds = 0.0
+                for index in segments.indices {
+                    let segment = segments[index]
+                    let duration = segment.end - segment.start
+                    guard rechecks < 2, recheckedSeconds + duration <= 15,
+                          RecognitionQuality.shouldRecheck(meanLogProbability: segment.score, duration: duration, usedBeamSearch: useBeamSearch) else { continue }
+                    rechecks += 1
+                    recheckedSeconds += duration
+                    if let revised = recheck(segment, audioBuffer: audioBuffer, language: effectiveLanguage,
+                                             vocabulary: hintContext, threadCount: threadCount) {
+                        segments[index].text = revised
+                    }
+                }
+                if rechecks > 0 {
+                    DebugLog.shared.log("[WhisperBridge] qualityRechecks=\(rechecks) seconds=\(String(format: "%.2f", recheckedSeconds))")
+                }
+            }
+            let transcription = segments.map(\.text).joined()
 
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count)")
             return Transcription(text: trimmed, language: effectiveLanguage)
         }
+    }
+
+    private struct RecognizedSegment {
+        var text: String
+        let start: Double
+        let end: Double
+        let score: Double
+    }
+
+    private func meanLogProbability(segment: Int32) -> Double {
+        let tokenCount = whisper_full_n_tokens(context, segment)
+        var logSum = 0.0
+        var count = 0
+        for index in 0..<tokenCount {
+            let token = whisper_full_get_token_data(context, segment, index)
+            guard token.id < whisper_token_eot(context), token.p > 0 else { continue }
+            logSum += log(Double(token.p))
+            count += 1
+        }
+        return count == 0 ? 0 : logSum / Double(count)
+    }
+
+    private func recognitionPrompt(_ hints: RecognitionVocabulary.Context, language: AppSettings.DictationLanguage, recognizedContext: String = "") -> String {
+        let confirmed = hints.confirmedCorrections.filter { $0.language == "auto" || $0.language == language.rawValue }.map(\.spelling)
+        return RecognitionVocabulary.prompt(language: language, customTerms: hints.customTerms,
+            confirmedTerms: confirmed + hints.confirmedTerms, learnedTerms: hints.learnedTerms,
+            basePrompt: hints.basePrompt, recognizedContext: recognizedContext,
+            tokenBudget: min(216, Int(whisper_n_text_ctx(context)) / 2 - 8),
+            tokenCount: { self.tokenCount($0) })
+    }
+
+    private func tokenCount(_ text: String) -> Int {
+        // Byte count bounds BPE token count and avoids the C API's noisy max=0 probe.
+        var tokens = [whisper_token](repeating: 0, count: max(1, text.utf8.count))
+        return text.withCString { string in
+            tokens.withUnsafeMutableBufferPointer { buffer in
+                Int(whisper_tokenize(context, string, buffer.baseAddress, Int32(buffer.count)))
+            }
+        }
+    }
+
+    private func recheck(_ segment: RecognizedSegment, audioBuffer: [Float], language: AppSettings.DictationLanguage,
+                         vocabulary: RecognitionVocabulary.Context, threadCount: Int) -> String? {
+        // Use only the captured segment, no neighbouring speech that could be duplicated.
+        let start = max(0, Int(segment.start * 16000))
+        let end = min(audioBuffer.count, Int(segment.end * 16000))
+        guard end > start else { return nil }
+        let samples = Array(audioBuffer[start..<end])
+        var params = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH)
+        params.beam_search.beam_size = 3
+        params.n_threads = Int32(threadCount)
+        params.no_context = true
+        params.translate = false
+        params.single_segment = true
+        params.temperature_inc = 0
+        params.suppress_nst = true
+        params.print_progress = false
+        params.print_realtime = false
+        let prompt = recognitionPrompt(vocabulary, language: language, recognizedContext: segment.text)
+        let status = language.whisperCode.withCString { languageString in
+            prompt.withCString { promptString in
+                params.language = languageString
+                params.initial_prompt = promptString
+                return samples.withUnsafeBufferPointer { whisper_full(context, params, $0.baseAddress, Int32(samples.count)) }
+            }
+        }
+        guard status == 0, whisper_full_n_segments(context) == 1,
+              let candidateText = whisper_full_get_segment_text(context, 0) else { return nil }
+        let candidate = String(cString: candidateText)
+        guard RecognitionQuality.accepts(original: segment.text, candidate: candidate,
+            originalScore: segment.score, candidateScore: meanLogProbability(segment: 0)),
+            language != .english || !RecognitionVocabulary.containsCyrillic(candidate),
+            RecognitionVocabulary.allows(candidate, language: language) else { return nil }
+        return " " + candidate.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func resolveLanguage(
@@ -294,38 +396,6 @@ final class WhisperBridge: @unchecked Sendable {
         return String(cString: cString)
     }
 
-    private static func decodePrompt(_ prompt: String, for language: AppSettings.DictationLanguage) -> String {
-        let languagePrompt: String
-        let userPrompt: String
-
-        switch language {
-        case .english:
-            languagePrompt = """
-            Transcribe in English only. Use the Latin alphabet only. Never output Russian, Bulgarian, Cyrillic, or Cyrillic transliteration. If speech is unclear, choose the closest English words. Preserve technical terms such as Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent, account, authentication, re-authentication.
-            """
-            userPrompt = prompt
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .filter { !Self.containsCyrillic(String($0)) }
-                .joined(separator: "\n")
-        case .bulgarian:
-            languagePrompt = """
-            Транскрибирай единствено на български книжовен език с българска кирилица. Не превеждай към английски, руски или друг език. Не използвай латиница за български думи и не използвай руски думи. Запазвай естествените български форми, правилните членувания, разделното писане на „не“ и стандартната пунктуация. Когато говорът е неясен, избирай най-вероятната българска дума според контекста. Запазвай разпознаваеми разговорни думи като щото, кво, някъв, днеска и технологични думи като апликация, сетинги, шорткът, промпт, бекенд, фронтенд, репо, комит. Изписвай правилно българските градове: Благоевград, София, Пловдив, Варна, Бургас, Русе, Стара Загора, Плевен, Велико Търново, Габрово, Видин, Враца, Монтана, Перник, Кюстендил, Пазарджик, Смолян, Кърджали, Хасково, Ямбол, Сливен, Шумен, Разград, Силистра, Добрич, Търговище, Ловеч, Ботевград, Асеновград. Запазвай английски технически термини като Openclaw, Hermes, Codex, Notion, Telegram, SEO, Wix, ChatGPT, API, backend, frontend, prompt, agent.
-            """
-            userPrompt = prompt
-        case .auto:
-            languagePrompt = ""
-            userPrompt = prompt
-        }
-
-        let trimmedPrompt = userPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedPrompt.isEmpty ? languagePrompt : languagePrompt + "\n" + trimmedPrompt
-    }
-
-    private static func containsCyrillic(_ text: String) -> Bool {
-        text.unicodeScalars.contains { scalar in
-            (0x0400...0x04FF).contains(Int(scalar.value))
-        }
-    }
 }
 
 enum WhisperError: LocalizedError {

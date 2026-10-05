@@ -21,6 +21,9 @@ SWIFT_FILES := \
 	DictatorMD/Utilities/DebugLog.swift \
 	DictatorMD/Utilities/AppUpdater.swift \
 	DictatorMD/Utilities/DictationMemory.swift \
+	DictatorMD/Utilities/PersonalCorrections.swift \
+	DictatorMD/Engine/RecognitionVocabulary.swift \
+	DictatorMD/Engine/RecognitionQuality.swift \
 	DictatorMD/Engine/WhisperBridge.swift \
 	DictatorMD/Engine/AutoLanguageDecision.swift \
 	DictatorMD/Engine/AudioCapture.swift \
@@ -51,7 +54,7 @@ SWIFT_FILES := \
 LIBS := -lwhisper -lggml -lggml-base -lggml-cpu -lggml-metal -lggml-blas -lc++
 FRAMEWORKS := -framework Accelerate -framework Metal -framework MetalKit -framework AVFoundation -framework CoreGraphics -framework AppKit -framework Foundation -framework ServiceManagement -framework CoreAudio
 
-.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke insertion-smoke single-instance-smoke auto-language-smoke foundations-smoke live-insertion-smoke live-insertion-build
+.PHONY: all clean whisper model app run dmg install-local verify-signing ui-smoke node-smoke history-smoke dashboard-resize-smoke text-smoke recognition-smoke recognition-audio-build insertion-smoke single-instance-smoke auto-language-smoke foundations-smoke live-insertion-smoke live-insertion-build
 
 all: whisper app
 
@@ -158,6 +161,9 @@ text-smoke:
 		DictatorMD/Utilities/Settings.swift \
 		DictatorMD/Utilities/AppPaths.swift \
 		DictatorMD/Utilities/DebugLog.swift \
+		DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Utilities/PersonalCorrections.swift \
+		DictatorMD/Engine/RecognitionVocabulary.swift \
 		DictatorMD/Engine/ProsodyAnalyzer.swift \
 		DictatorMD/Engine/BulgarianTextCorrector.swift \
 		DictatorMD/Engine/BulgarianPlaceNames.swift \
@@ -166,6 +172,27 @@ text-smoke:
 		scripts/verify-text-corrector.swift \
 		-o /tmp/dictatormd-smoke/verify-text-corrector
 	@/tmp/dictatormd-smoke/verify-text-corrector
+
+recognition-smoke:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -framework AppKit -framework Foundation \
+		DictatorMD/Utilities/Settings.swift DictatorMD/Utilities/AppPaths.swift \
+		DictatorMD/Utilities/DebugLog.swift DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Utilities/PersonalCorrections.swift DictatorMD/Engine/RecognitionVocabulary.swift \
+		DictatorMD/Engine/RecognitionQuality.swift scripts/verify-recognition.swift \
+		-o /tmp/dictatormd-smoke/verify-recognition
+	@/tmp/dictatormd-smoke/verify-recognition
+
+recognition-audio-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -sdk "$(SDK)" -import-objc-header DictatorMD/DictatorMD-Bridging-Header.h \
+		-I lib -L lib $(LIBS) $(FRAMEWORKS) -parse-as-library \
+		DictatorMD/Utilities/Settings.swift DictatorMD/Utilities/AppPaths.swift \
+		DictatorMD/Utilities/DebugLog.swift DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Utilities/PersonalCorrections.swift DictatorMD/Engine/ModelManager.swift \
+		DictatorMD/Engine/RecognitionVocabulary.swift DictatorMD/Engine/RecognitionQuality.swift \
+		DictatorMD/Engine/AutoLanguageDecision.swift DictatorMD/Engine/WhisperBridge.swift \
+		scripts/verify-recognition-audio.swift -o /tmp/dictatormd-smoke/verify-recognition-audio
 
 auto-language-smoke:
 	@mkdir -p /tmp/dictatormd-smoke
