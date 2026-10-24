@@ -34,6 +34,7 @@ final class DictationEngine {
 
     private let minRecordingDuration: TimeInterval = 0.3
     private var recordingStartTime: Date?
+    private var recordingLanguage: AppSettings.DictationLanguage = .auto
     private var insertionTargetApp: NSRunningApplication?
     private var insertionTarget: InsertionTarget?
     private var pendingPreviewTarget: InsertionTarget?
@@ -147,6 +148,12 @@ final class DictationEngine {
     }
 
     func reloadModel() {
+        // Model/language edits during a recording take effect on the next start.
+        // Keep the current operation's decoder alive until its work is finished.
+        guard state == .idle else {
+            DebugLog.shared.log("[DictationEngine] model reload deferred until idle")
+            return
+        }
         isModelLoaded = false
         modelLoadError = nil
         whisperBridge = nil
@@ -378,6 +385,7 @@ final class DictationEngine {
         canUndoLastInsertion = false
         insertionTarget = currentInsertionTarget()
         insertionTargetApp = insertionTarget?.app
+        recordingLanguage = language
         DebugLog.shared.log("[DictationEngine] startRecording target=\(insertionTargetApp?.localizedName ?? "nil") bundle=\(insertionTargetApp?.bundleIdentifier ?? "nil")")
         state = .recording
         recordingStartTime = Date()
@@ -534,7 +542,9 @@ final class DictationEngine {
         let gate = operationGate
 
         let bridge = self.whisperBridge
-        let language = AppSettings.shared.dictationLanguage
+        // A language switch in the UI applies to the next recording, not audio
+        // already captured with this operation's model and destination.
+        let language = recordingLanguage
         let basePrompt = AppSettings.shared.vocabularyPrompt
         let customTerms = AppSettings.shared.customTerms
         let learnedTerms = DictationMemory.shared.topPromptTerms(for: language)

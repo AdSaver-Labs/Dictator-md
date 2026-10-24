@@ -1,6 +1,6 @@
 # Dictator-md Platform Readiness Blueprint
 
-Updated: 2026-07-20
+Updated: 2026-10-24
 
 ## Purpose
 
@@ -36,6 +36,154 @@ This is the execution order for turning Dictator-md from a working macOS product
 5. Model downloads, updates, and privacy disclosures must use the same product truth across every platform.
 
 ## Execution Roadmap
+
+### Research Refresh: Reliability Before Expansion
+
+This review covers 18 relevant products/product families plus inference and
+voice-session infrastructure. It is a representative survey, not a claim to
+have tested every dictation product on the internet. Public documentation and
+source inspection establish implementation ideas, not comparative accuracy.
+Closed-source services do not expose their production recognition/insertion
+backends. No competitor binaries or new models were installed for this review.
+
+#### Product Evidence and Useful Ideas
+
+| Product | Primary evidence | What is useful for Dictator-md |
+| --- | --- | --- |
+| Handy | [Paste transaction source](https://github.com/cjpais/Handy/blob/5a9451e70aedc90648ce2befd9d7e0304746f9c1/src-tauri/src/paste_tx/mod.rs), [known clipboard race](https://github.com/cjpais/Handy/issues/502) | Clipboard consumption is asynchronous. Preserve ownership and separate sent from delivered. A clipboard read is not proof of which editor inserted it. |
+| FreeFlow | [Captured-target implementation](https://github.com/zachlatta/freeflow/blob/a647469d268d2265f036b4024c509e14eea7fa1c/Sources/AppTextInsertionTarget.swift), [README](https://github.com/zachlatta/freeflow) | Capture field/value/selection, verify edits, bound context, recover last transcript. Cleanup/edit mode normally uses a provider; do not add that dependency to offline dictation. |
+| OpenWhispr | [Native paste helper](https://github.com/OpenWhispr/openwhispr/blob/7a6ae826de9ec1caf65f3a6e769475dab2ae829f/resources/macos-fast-paste.swift), [product source](https://github.com/OpenWhispr/openwhispr) | Resolve Command-V for the active keyboard layout; separate platform integrations, notes, models and optional agent features. |
+| VoiceInk | [AX reader](https://github.com/Beingpax/VoiceInk/blob/0ac374d0147a9c612f75361c02c43037209df96d/VoiceInk/Features/Dictionary/AutoLearn/AutoLearnAXTextReader.swift), [releases](https://github.com/Beingpax/VoiceInk/releases) | Bounded accessibility queries, editor-specific text access, explicit dictionary correction/import/export and quick history. |
+| WhisperDictation | [Upstream README](https://github.com/sam-pop/WhisperDictation) | Commit-on-pause is an optional latency approach. Keep final delivery atomic by default; terminals must never receive speculative rewrites. |
+| open-wispr | [Repository](https://github.com/cpiprint/open-wispr) | This is an OpenWhispr fork, not an independent engine. Avoid counting the same architecture twice or merging an older fork indiscriminately. |
+| Whispering / Epicenter | [Project transition](https://github.com/braden-w/whispering/blob/main/README.md), [release history](https://github.com/braden-w/whispering/releases) | Native recording lifecycle, recoverable recordings and independently retryable stages. Audio retention must be opt-in here. |
+| Wispr Flow | [Context](https://docs.wisprflow.ai/articles/4678293671-Context-Awareness), [privacy](https://wisprflow.ai/privacy) | Context and confirmed edit learning can improve names and formatting. Its cloud processing is not equivalent to our local constraint. |
+| Superwhisper | [Modes](https://superwhisper.com/docs/modes/modes), [changelog](https://superwhisper.com/changelog) | Explicit language/model/formatting modes, app-specific workflows, microphone lifecycle and recoverable history. Keep translation separate from transcription. |
+| MacWhisper | [Dictation](https://docs.macwhisper.com/article/14-how-to-use-the-dictation-feature), [replacements](https://docs.macwhisper.com/article/37-find-and-replace-in-transcriptions) | Whole-word correction rules, import/export and app profiles. Advanced AI transformations are optional, not a prerequisite for typing. |
+| Aqua Voice | [Product](https://aquavoice.com/) | Low-friction delivery is a useful UX target. Marketing accuracy claims are not a benchmark or access to its backend. |
+| Buzz | [Source/README](https://github.com/chidiwilliams/buzz) | File-based regression testing, backend separation, export and inspection. Batch transcription features are lower priority than daily dictation. |
+| Speech Note | [Source/README](https://github.com/mkiol/dsnote) | Capability-based model catalog and separation of speech recognition, translation and synthesis. Bulgarian support must be checked per engine. |
+| FUTO Voice Input / Keyboard | [Language selection](https://docs.keyboard.futo.tech/settings/languagesmodels), [source](https://github.com/futo-org/voice-input) | Limit auto-detection to enabled languages, use Android voice/IME APIs, and publish honest keyboard compatibility. Not every Android keyboard accepts a replacement voice service. |
+| Aiko | [Product/FAQ](https://sindresorhus.com/aiko) | Clear on-device processing and transcript recovery/export. Recording transcription is not proof of system-wide insertion. |
+| Talon | [Product](https://talonvoice.com/) | Separate command and dictation modes; explicit spoken corrections and accessibility workflows. Commands must not execute from ordinary dictation. |
+| Apple Dictation / Microsoft Voice Access | [Apple](https://support.apple.com/en-gb/guide/mac-help/mh40584/mac), [Microsoft corrections](https://support.microsoft.com/en-us/accessibility/windows/voice-access/correct-text-with-voice) | Uncertain-word alternatives, spelling/correction flow, punctuation controls. OS integration is not available identically to third-party apps. |
+| Google AI Edge Eloquent | [Publisher's listing](https://apps.apple.com/us/app/google-ai-edge-eloquent/id6756505519) | Guided onboarding, editable personal dictionary and a clear offline/cloud distinction. Verify mobile insertion capabilities rather than assuming global keyboard replacement. |
+
+License boundary: [Handy](https://github.com/cjpais/Handy/blob/main/LICENSE),
+FreeFlow and OpenWhispr publish MIT-licensed code. VoiceInk publishes
+[GPL-3.0](https://github.com/Beingpax/VoiceInk/blob/main/LICENSE); FUTO Voice Input
+uses a [Source First license](https://github.com/futo-org/voice-input/blob/master/LICENSE.md)
+with use/distribution restrictions. This pass uses implementation ideas and
+platform APIs, not copied GPL/FUTO code. Any later code import needs a specific
+license and attribution review; a free download does not make code unrestricted.
+
+#### Findings in Our Current Implementation
+
+- Local diagnostics showed a successful Telegram AX write but missing focused
+  fields in Codex, followed by a failed restore or an unverified coordinate paste.
+  These are separate from recognition errors. Do not infer that every failure is
+  an Accessibility permission issue or change signing to try to repair it.
+- Auto could choose Bulgarian from a tiny Bulgarian score when another Slavic
+  language won. It also locked a long recording from only two seconds of audio.
+- The language was read again at stop, and model reload could interrupt an active
+  operation. A UI change could alter an already-started recording's contract.
+- Paste used a fixed US physical key. That is not Command-V on every layout.
+- Accessibility opt-in was cached by PID indefinitely; a renderer reset could
+  leave the cache claiming a usable tree when no field was exposed.
+- Existing code already preserves failed transcripts, checks original windows,
+  protects newer clipboard copies and avoids blind duplicate-producing retries.
+  Keep these behaviors; additional delay alone is not a reliability fix.
+
+#### Implemented in 1.0.33
+
+- [x] Remove unsupported-Slavic-to-Bulgarian coercion and require meaningful
+  English/Bulgarian evidence. Examine up to eight opening seconds; broaden to at
+  most thirty seconds when uncertain. Manual EN/BG still overrides detection.
+- [x] Freeze the language at recording start and defer active-operation model
+  replacement. Settings changes take effect on the next recording.
+- [x] Refresh the Electron opt-in when focus is missing; check window-level focus
+  as well as application focus, validating the owning process.
+- [x] Resolve the paste key using the current Command-modified keyboard layout.
+  No arbitrary US-key fallback. Add US, Dvorak, French and two Bulgarian checks.
+
+Auto still falls back to English when the available evidence remains uncertain.
+This is not a guarantee for one-word, whispered or mixed-language speech. A
+recoverable language-review flow is the next step, not stronger forced guessing.
+
+#### Prioritized Remaining Improvements
+
+The following are proposed work, not shipped features. Preserve visual design.
+No new model or cloud service is required for P0/P1 unless explicitly stated.
+
+| Priority | Improvement | Acceptance gate |
+| --- | --- | --- |
+| P0 | Persist delivery status, destination bundle, strategy, timing and reason per history item, with no field contents/audio in diagnostic logs | Failed, unverified and confirmed are distinguishable; export redacts user content |
+| P0 | Retain an in-memory operation for explicit retry/copy/retranscribe after failure; never silently retarget | No duplicate insert and no wrong-app insert across retries/cancellation |
+| P0 | Snapshot original field value/selection; refuse destructive insertion if that same editor was repurposed during decoding | Changed draft, navigated tab and new chat tests leave unrelated text untouched |
+| P0 | Expand editor adapters using supported AX attributes, readable range APIs and bounded focus polling | Live readback in Codex, Hermes, Chrome URL/rich fields, Messages, Viber and CapCut; not just an event-post result |
+| P0 | Add secure-field exclusion, ownership checks immediately before dispatch, and lifecycle tests for closed/minimized/recreated windows | No input to password controls or a new foreground application |
+| P0 | Preserve uncertain language as uncertainty; offer EN/BG retry using short-lived RAM audio rather than lose or translate a prompt | Same recording can be recovered without speaking again; RAM cleared on dismissal/timeout |
+| P0 | Expand automated language tests to ambiguous greetings, silence first, borrowed words, accents, mixed scripts and mode changes | Measure wrong-language rate separately from spelling errors; no manual-mode switch |
+| P0 | Audit settings/model state concurrency, including overlapping reload requests and stop/start races | Latest requested model wins; no result from cancelled recording reaches a field |
+| P0 | Verify stable identity across install/update; require checksum/signature validation, rollback and matching build metadata | Update preserves permissions/data, rejects stale or mismatched artifacts |
+| P1 | Local per-app delivery diagnostics and a disposable compatibility test in onboarding | User can identify capture, recognition or insertion failure without resetting permissions |
+| P1 | Bounded speech-aware language sampling that excludes leading silence without clipping whispers | Compare held-out EN/BG recordings, latency and low-volume speech against 1.0.33 |
+| P1 | Opt-in local nearby-text vocabulary with strict length/time limits and secure-app exclusions | Proper-name recall improves without leaking context or inserting unspoken words |
+| P1 | Dictionary packs for Bulgarian names/places/technical terms, scoped by app/topic | Measure term recall and false substitutions; hints stay inside token budget |
+| P1 | Explicit correction learning with import/export, conflict resolution and undo | No automatic promotion of ASR mistakes to trusted replacements |
+| P1 | Conservative grammar/punctuation; separate literal/code/prose modes | Negation, numbers, URLs, names and meaning preserved on bilingual fixtures |
+| P1 | Expose low-confidence spans and original-vs-cleaned text for review | Confidence described as a heuristic, not a correctness guarantee |
+| P1 | Audio-device disconnect/reconnect, Bluetooth route changes, input-level and clipping diagnostics | Capture survives common device changes or reports an actionable error |
+| P1 | Quiet-speech calibration with conservative gain/VAD and preserved tail audio | Better measured word accuracy, not merely a larger waveform |
+| P1 | Benchmark ASR thread count, warm model reuse, cancellation and memory lifecycle | Report p50/p95 stop-to-text latency and peak memory by duration/language/hardware |
+| P1 | Preview transcription during speech using stable prefixes/commit-on-pause behind an opt-in | No duplicated boundary words or speculative text in terminals; final-only remains default |
+| P1 | Crash-safe history storage/migrations, aggregates independent of transcript retention | Interrupted writes recover; retention deletion does not corrupt statistics |
+| P1 | Accessibility, keyboard-only use, responsive layouts and reduced-motion regression checks | No new design work; existing controls remain usable at compact sizes |
+| P2 | Compare other already-compatible runtimes/models only after a measured baseline and user-approved download | Bulgarian capability, storage/RAM, license and real-device WER verified, not inferred from model size |
+| P2 | Complete Windows audio/ASR before advertising parity; use UI Automation plus guarded clipboard fallback | Real recordings reach target editors on physical Windows, not placeholder strings |
+| P2 | Android IME with local ASR, editor lifecycle handling and bounded model resources | Physical-device battery/thermal/keyboard tests and input-connection recovery |
+| P2 | iOS containing-app capture plus keyboard handoff and truthful limitations | Signed real-device tests; no promise to replace Apple's dictation key globally |
+
+#### Inference and Future Voice-Agent References
+
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp/tree/master/examples/stream)
+already provides streaming examples, but naive repeated windows are not a
+production merge policy. [Whisper-Streaming](https://github.com/ufal/whisper_streaming)
+provides a local-agreement approach for stable prefixes. Evaluate these with the
+existing model first. [Argmax/WhisperKit](https://github.com/argmaxinc/argmax-oss-swift)
+and [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) are runtime candidates,
+not drop-in promises of better Bulgarian accuracy or zero resource cost.
+
+Voice-agent work remains separate and unimplemented:
+
+1. Versioned VoiceSession and provider adapters for OpenClaw, Hermes and others;
+   authenticated connections and explicit local/remote data boundaries.
+2. Streaming ASR -> agent -> streaming TTS, with measured response latency.
+3. Echo cancellation, turn detection, interruptions/barge-in and reconnects.
+4. Tool-action approval, conversation retention/deletion and per-agent access.
+5. Only then multi-participant rooms, moderation, billing and operational costs.
+
+[Pipecat](https://docs.pipecat.ai/pipecat/learn/speech-input) and
+[LiveKit Agents](https://docs.livekit.io/agents/) offer relevant transport,
+turn-taking and interruption architecture. Open-source frameworks do not make
+hosted inference or network infrastructure free. Dictation must keep working
+offline if every agent provider is unavailable.
+
+#### Release Evidence Standard
+
+For each reliability release: run deterministic tests, real native field
+readbacks, browser/editor checks where permitted, synthetic EN/BG audio, and
+report the limits. Codex UI automation is blocked by the current test environment;
+do not bypass that boundary or claim a Codex live test passed. Ask for a short
+user acceptance test after installation. Synthetic speech is not evidence of
+perfect recognition of the user's accent. Public superiority claims require a
+matched, consented, held-out benchmark across products, which this survey is not.
+
+### Earlier Cross-Platform Roadmap
+
+The original platform checklist below records broader work. The dated research
+refresh above is the current dictation priority order; old unchecked items may
+now be partially covered by the subsequent compatibility/recognition protocols.
 
 ### P0 - Guardrails and Proof (implemented in this pass)
 

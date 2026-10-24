@@ -205,6 +205,10 @@ insertion-smoke:
 live-insertion-smoke: live-insertion-build
 	@/tmp/dictatormd-smoke/verify-live-insertion
 
+.PHONY: keyboard-layout-smoke
+keyboard-layout-smoke: live-insertion-build
+	@/tmp/dictatormd-smoke/verify-live-insertion --keyboard-layouts
+
 live-insertion-build:
 	@mkdir -p /tmp/dictatormd-smoke
 	xcrun swiftc -framework AppKit -framework CoreGraphics \

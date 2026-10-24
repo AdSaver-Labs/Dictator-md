@@ -1,11 +1,16 @@
 import AppKit
 import Foundation
+import Carbon.HIToolbox
 
 // A disposable external AppKit editor exercises the production injector, not a mock.
 @main
 struct LiveInsertionTest {
     static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--keyboard-layouts") {
+            do { try checkKeyboardLayouts(); exit(0) }
+            catch { fputs("Keyboard layout check failed: \(error)\n", stderr); exit(1) }
+        }
         if CommandLine.arguments.contains("--fixture") {
             app.setActivationPolicy(.regular)
             let fixture = EditorFixture(directory: URL(fileURLWithPath: CommandLine.arguments.last!))
@@ -34,6 +39,30 @@ struct LiveInsertionTest {
             }
             app.run()
         }
+    }
+
+    static func checkKeyboardLayouts() throws {
+        let expectations: [(String, CGKeyCode?)] = [
+            ("com.apple.keylayout.US", 9),
+            ("com.apple.keylayout.Dvorak", 47),
+            ("com.apple.keylayout.French", nil),
+            ("com.apple.keylayout.Bulgarian", nil),
+            ("com.apple.keylayout.Bulgarian-Phonetic", nil)
+        ]
+        for (id, expected) in expectations {
+            let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+            let sources = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
+            guard let source = sources.first,
+                  let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else {
+                throw Failure("Missing system keyboard fixture: \(id)")
+            }
+            let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+            guard let key = TextInjector.pasteKeyCode(layoutData: data), expected == nil || key == expected else {
+                throw Failure("Paste key did not resolve for \(id)")
+            }
+            print("PASS \(id) Command-V physical key=\(key)")
+        }
+        print("Five keyboard layouts verified without changing the user's input source.")
     }
 
     static func runSurfaceCheck() throws {

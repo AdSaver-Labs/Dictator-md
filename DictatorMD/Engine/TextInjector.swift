@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 
@@ -144,10 +145,7 @@ final class TextInjector {
         guard let expected = target.focusedElement else {
             return target.clickAnchor != nil && target.focusedWindow != nil
         }
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let focused, CFEqual(expected, focused) else { return false }
+        guard let focused = FocusTracker.focusedElement(in: app), CFEqual(expected, focused) else { return false }
         return true
     }
 
@@ -333,8 +331,12 @@ final class TextInjector {
     }
 
     private func postPasteShortcut() -> Bool {
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else {
+        guard let key = Self.pasteKeyCode() else {
+            DebugLog.shared.log("[TextInjector] no Paste key in current keyboard layout; clipboard recovery retained")
+            return false
+        }
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false) else {
             return false
         }
 
@@ -344,6 +346,35 @@ final class TextInjector {
         Thread.sleep(forTimeInterval: 0.012)
         keyUp.post(tap: .cghidEventTap)
         return true
+    }
+
+    static func pasteKeyCode() -> CGKeyCode? {
+        func layout(_ source: TISInputSource?) -> Data? {
+            guard let source, let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+            return Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        }
+        // Input methods without layout data use the user's ASCII layout. Do not
+        // fall back to a US physical key when a real non-US layout has no match.
+        guard let data = layout(TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue())
+            ?? layout(TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue()) else { return nil }
+        return pasteKeyCode(layoutData: data)
+    }
+
+    static func pasteKeyCode(layoutData: Data) -> CGKeyCode? {
+        layoutData.withUnsafeBytes { bytes in
+            guard let address = bytes.baseAddress else { return nil }
+            let keyboard = address.assumingMemoryBound(to: UCKeyboardLayout.self)
+            for key: UInt16 in 0..<128 {
+                var deadState: UInt32 = 0
+                var length = 0
+                var characters = [UniChar](repeating: 0, count: 8)
+                let status = UCKeyTranslate(keyboard, key, UInt16(kUCKeyActionDown), UInt32(cmdKey >> 8),
+                    UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                    &deadState, characters.count, &length, &characters)
+                if status == noErr, length == 1, characters[0] == 0x76 { return key }
+            }
+            return nil
+        }
     }
 
     private func postMouseClick(at point: CGPoint) -> Bool {

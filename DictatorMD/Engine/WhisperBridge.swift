@@ -336,7 +336,9 @@ final class WhisperBridge: @unchecked Sendable {
         guard maxLanguageID > 0 else { return .english }
         let englishID = whisper_lang_id("en")
         let bulgarianID = whisper_lang_id("bg")
-        let openingSamples = min(audioBuffer.count, 2 * 16000)
+        // A greeting or one borrowed word is too little evidence for locking a
+        // long prompt. Use a phrase, then broaden only if it remains uncertain.
+        let openingSamples = min(audioBuffer.count, 8 * 16000)
         var cachedDetection: (sampleCount: Int, english: Float, bulgarian: Float, top: String)?
 
         func detect(sampleCount: Int, requireStrongEvidence: Bool) -> AppSettings.DictationLanguage? {
@@ -380,9 +382,10 @@ final class WhisperBridge: @unchecked Sendable {
            let openingLanguage = detect(sampleCount: openingSamples, requireStrongEvidence: true) {
             return openingLanguage
         }
-        if let fullLanguage = detect(sampleCount: audioBuffer.count, requireStrongEvidence: false) {
+        if let fullLanguage = detect(sampleCount: min(audioBuffer.count, 30 * 16000), requireStrongEvidence: false) {
             return fullLanguage
         }
+        DebugLog.shared.log("[WhisperBridge] autoDetection unresolved; using English fallback (manual EN/BG overrides Auto)")
         return .english
     }
 

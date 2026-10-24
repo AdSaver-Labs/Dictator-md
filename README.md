@@ -68,15 +68,18 @@ iOS cannot replace Apple's built-in dictation button globally. The iOS path is a
 The current platform audit and execution order are maintained in [`docs/PLATFORM_READINESS_BLUEPRINT.md`](docs/PLATFORM_READINESS_BLUEPRINT.md). It distinguishes working functionality from Windows/mobile scaffolds and defines the release gates for each platform.
 
 **Why Dictator-md?**
-- Apple's built-in dictation sends audio to Apple servers and has limited accuracy for technical terms
-- Commercial tools like Willow Voice and WisprFlow cost $8-15/month
-- Dictator-md is **completely free**, runs **100% offline**, and is **optimized for developers** with 500+ technical terms built in
+- Free local recognition, with no transcription subscription or API key.
+- English/Bulgarian profiles, personal corrections and technical vocabulary.
+- Open code and explicit recovery when a destination cannot accept text.
+
+The [research and reliability roadmap](docs/PLATFORM_READINESS_BLUEPRINT.md#research-refresh-reliability-before-expansion)
+compares relevant alternatives and separates shipped improvements from planned work.
 
 ## Features
 
 - **Push-to-talk OR toggle mode** -- hold a hotkey and release, OR press once to start and once to stop. Toggle mode is **carpal-tunnel friendly** for long dictations and anyone with RSI; it requires a configurable hold (default 1.5s) to prevent accidental activation.
-- **Works in any app** -- Terminal, VS Code, Claude Code, Xcode, Slack, browsers, email -- anywhere you can type
-- **Fast** -- sub-second transcription on Apple Silicon (Metal GPU). Optimized CPU path for Intel Macs.
+- **System-wide dictation** -- captured-target insertion with clipboard/History recovery. Some custom editors or changed destinations cannot be verified; see the [compatibility matrix](docs/DICTATION_COMPATIBILITY.md).
+- **Local acceleration** -- Metal on Apple Silicon and a CPU path on Intel. Latency depends on recording length, model and system load.
 - **100% private** -- all audio processing happens locally. Nothing is sent to any server, ever.
 - **Developer-optimized** -- built-in vocabulary of 500+ technical terms biases Whisper toward correct recognition of API, JSON, Kubernetes, PostgreSQL, GraphQL, etc.
 - **Smart grammar correction** -- auto-capitalizes sentences, fixes 100+ acronym/term casings (api->API, javascript->JavaScript), adds punctuation
@@ -92,7 +95,7 @@ The current platform audit and execution order are maintained in [`docs/PLATFORM
 
 Dictator-md runs **100% locally**. Your audio never leaves your Mac. There is no server, no account, no telemetry, no tracking of any kind.
 
-**Don't trust us — verify it yourself.** The entire app is ~2,500 lines of Swift. You can audit every network call in one command:
+**Don't trust us — verify it yourself.** The recognition pipeline is local. Start inspecting network use with:
 
 ```bash
 grep -rE "URLSession|http" DictatorMD/**/*.swift
@@ -104,7 +107,7 @@ grep -rE "URLSession|http" DictatorMD/**/*.swift
 ### What we don't do
 
 - ❌ Send audio or transcriptions anywhere
-- ❌ Track, analyze, or log anything
+- ❌ Send telemetry. Local history, statistics and technical diagnostic logs remain on the device.
 - ❌ Auto-install updates without your click, telemetry, or license-check
 - ❌ Store or upload clipboard contents. Clipboard paste temporarily snapshots the existing clipboard in memory so it can be restored after confirmed delivery; failed/unverified dictation keeps its text available for recovery.
 - ❌ Load web fonts or external scripts
@@ -400,7 +403,7 @@ Contributions are welcome! Here's how to get started:
 
 ### Ideas for Contributions
 
-- Additional language support (currently English-only)
+- Additional language support beyond the current English/Bulgarian profiles
 - Custom sound packs for audio feedback
 - Clipboard mode (copy to clipboard instead of typing)
 - Per-app vocabulary profiles

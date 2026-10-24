@@ -71,6 +71,11 @@ final class FocusTracker {
             return systemField ?? app.flatMap(Self.focusedElement(in:))
         }
         var focusedElement = captureField()
+        if focusedElement == nil, let app {
+            // Renderer trees can disappear without the application's PID changing.
+            // A successful opt-in earlier in the day is not a permanent guarantee.
+            enableWebAccessibility(in: app, refresh: true)
+        }
         // Electron builds its AX tree asynchronously after the opt-in. Do not
         // permanently capture a missing editor merely because the first query raced it.
         if let app, accessibilityEnabledPIDs.contains(app.processIdentifier), focusedElement == nil {
@@ -86,6 +91,7 @@ final class FocusTracker {
         let windowFrame = window.flatMap(Self.frame(of:))
         let fieldFrame = focusedElement.flatMap(Self.frame(of:))
         let selectedRange = focusedElement.flatMap(Self.selectedTextRange(from:))
+        DebugLog.shared.log("[FocusTracker] captured bundle=\(app?.bundleIdentifier ?? "nil") field=\(focusedElement != nil) selection=\(selectedRange != nil) window=\(window != nil)")
         var anchor = validClickAnchor(for: app).flatMap { anchor -> ClickAnchor? in
             guard windowFrame?.contains(anchor.screenPoint) == true else { return nil }
             if let fieldFrame, !fieldFrame.contains(anchor.screenPoint) { return nil }
@@ -108,10 +114,11 @@ final class FocusTracker {
         )
     }
 
-    private func enableWebAccessibility(in app: NSRunningApplication) {
-        guard AXIsProcessTrusted(), !accessibilityEnabledPIDs.contains(app.processIdentifier) else { return }
+    private func enableWebAccessibility(in app: NSRunningApplication, refresh: Bool = false) {
+        guard AXIsProcessTrusted(), refresh || !accessibilityEnabledPIDs.contains(app.processIdentifier) else { return }
         // Electron documents this opt-in; unsupported native apps simply ignore it.
         let element = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(element, 0.2)
         let result = AXUIElementSetAttributeValue(element, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         if result == .success {
             accessibilityEnabledPIDs.insert(app.processIdentifier)
@@ -191,26 +198,39 @@ final class FocusTracker {
 
     private static func focusedElement() -> AXUIElement? {
         let systemWide = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(systemWide, 0.2)
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             systemWide,
             kAXFocusedUIElementAttribute as CFString,
             &value
         )
-        guard result == .success, let value else { return nil }
+        guard result == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         return (value as! AXUIElement)
     }
 
-    private static func focusedElement(in app: NSRunningApplication) -> AXUIElement? {
+    static func focusedElement(in app: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &value) == .success,
-              let value else { return nil }
-        return (value as! AXUIElement)
+        AXUIElementSetMessagingTimeout(appElement, 0.2)
+        // Some editors expose focus on the window, not the application root.
+        // Both paths must identify the same owning process; never pick an
+        // arbitrary text box simply because it exists in the accessibility tree.
+        for root in [appElement, focusedWindow(in: app)].compactMap({ $0 }) {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(root, kAXFocusedUIElementAttribute as CFString, &value) == .success,
+                  let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { continue }
+            let field = value as! AXUIElement
+            var pid: pid_t = 0
+            if AXUIElementGetPid(field, &pid) == .success, pid == app.processIdentifier {
+                return field
+            }
+        }
+        return nil
     }
 
     private static func focusedWindow(in app: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(appElement, 0.2)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value else { return nil }

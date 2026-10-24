@@ -19,6 +19,23 @@ normal input events. A verified captured field must not be clicked again merely
 because its application prefers clipboard paste. Coordinate clicking remains a
 fallback only when exact field restoration failed or no field was captured.
 
+Version 1.0.33 refreshes the Electron opt-in when field capture is missing,
+checks window-level focus when the application root provides none, and validates
+the focused element's PID. Paste resolves Command-V through the current keyboard
+layout rather than assuming US key code 9. No new permission, signing identity
+or automatic retry is introduced. Run `make keyboard-layout-smoke` without
+changing the user's input source; it covers US, Dvorak, French, Bulgarian and
+Bulgarian Phonetic. This does not constitute a live Codex test: current computer
+use tools disallow controlling Codex, and no workaround should bypass that rule.
+
+Local 1.0.33 verification (2026-10-24): universal app build, text/recognition/
+language/foundations contracts, five keyboard layouts, ten native live insertion
+cases and Chrome address-bar delivery after switching applications passed. Chrome
+readback contained the probe exactly once and the other app remained unchanged.
+Six synthetic audio fixtures selected the expected language and recognized all
+23 checked terms; the long Bulgarian fixture still had 9.5% raw word error rate.
+No user microphone recording was retained, and no additional model was downloaded.
+
 ## Automated checks
 
 | Surface or behavior | Result | Evidence |

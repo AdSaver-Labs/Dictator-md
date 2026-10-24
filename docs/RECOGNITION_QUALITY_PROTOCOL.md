@@ -50,6 +50,16 @@ These sources establish spelling, not recognition accuracy or medical guidance.
 7. Automatically observed history terms remain lower-confidence suggestions,
    not confirmed correction pairs. They must never trigger fuzzy substitutions.
 
+## Recording Language Invariant
+
+Snapshot the user's Auto/EN/BG choice at recording start. A later settings change
+must not reinterpret the current recording or replace its model while busy.
+Manual EN/BG never invokes language detection. Auto examines a phrase (up to
+eight seconds), then a bounded longer prefix if uncertain; an unsupported Slavic
+classification is never sufficient evidence for Bulgarian. Log unresolved Auto
+fallbacks without transcript/audio. Keep translation disabled. Test language
+choice separately from word accuracy, including borrowed first words and noise.
+
 ## Bounded Rechecks
 
 Recheck at most two uncertain segments of 1-12 seconds, with a combined maximum
