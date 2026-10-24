@@ -22,6 +22,12 @@ final class TextInjector {
         guard !prepared.isEmpty, shouldProceed() else {
             return InsertionDelivery(outcome: .failed, strategy: "none", reason: "cancelled", durationMilliseconds: 0)
         }
+        // The serial delivery queue may synchronously query the main-thread-only
+        // input-source API. Never let a UI caller block that thread waiting for us.
+        guard !Thread.isMainThread else {
+            DebugLog.shared.log("[TextInjector] rejected synchronous main-thread delivery")
+            return InsertionDelivery(outcome: .failed, strategy: "none", reason: "invalidExecutionContext", durationMilliseconds: 0)
+        }
         DebugLog.shared.log("[TextInjector] insert length=\(prepared.count) target=\(target?.appName ?? "nil") bundle=\(target?.bundleIdentifier ?? "nil") hasElement=\(target?.focusedElement != nil)")
 
         return typingQueue.sync {
@@ -392,6 +398,14 @@ final class TextInjector {
     }
 
     static func pasteKeyCode() -> CGKeyCode? {
+        if Thread.isMainThread { return currentPasteKeyCode() }
+        return DispatchQueue.main.sync { currentPasteKeyCode() }
+    }
+
+    private static func currentPasteKeyCode() -> CGKeyCode? {
+        // Carbon's input-source registry requires the main queue, including
+        // source lookup, property reads, translation and source release.
+        dispatchPrecondition(condition: .onQueue(.main))
         func layout(_ source: TISInputSource?) -> Data? {
             guard let source, let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
             return Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data

@@ -207,10 +207,10 @@ auto-language-smoke:
 .PHONY: language-review-engine-build
 language-review-engine-build:
 	@mkdir -p /tmp/dictatormd-smoke
-	xcrun swiftc -D LANGUAGE_REVIEW_TESTING -sdk "$(SDK)" -import-objc-header DictatorMD/DictatorMD-Bridging-Header.h \
+	xcrun swiftc -D LANGUAGE_REVIEW_TESTING -D ENGINE_PIPELINE_TESTING -sdk "$(SDK)" -import-objc-header DictatorMD/DictatorMD-Bridging-Header.h \
 		-I lib -L lib $(LIBS) $(FRAMEWORKS) -parse-as-library \
 		$(filter-out DictatorMD/App/DictatorMDApp.swift DictatorMD/Utilities/AppPaths.swift,$(SWIFT_FILES)) \
-		scripts/verify-language-review-engine.swift -o /tmp/dictatormd-smoke/verify-language-review-engine
+		scripts/verify-live-insertion.swift scripts/verify-language-review-engine.swift -o /tmp/dictatormd-smoke/verify-language-review-engine
 
 .PHONY: language-review-ui-build
 language-review-ui-build:
@@ -253,6 +253,20 @@ live-insertion-build:
 		DictatorMD/Engine/InsertionDelivery.swift \
 		scripts/verify-live-insertion.swift \
 		-o /tmp/dictatormd-smoke/verify-live-insertion
+
+.PHONY: keyboard-threading-build keyboard-threading-smoke
+keyboard-threading-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -framework AppKit -framework CoreGraphics \
+		DictatorMD/Utilities/Settings.swift DictatorMD/Utilities/AppPaths.swift \
+		DictatorMD/Utilities/DebugLog.swift DictatorMD/Utilities/FocusTracker.swift \
+		DictatorMD/Engine/PasteboardSnapshot.swift DictatorMD/Engine/TextInjector.swift \
+		DictatorMD/Engine/InsertionDelivery.swift scripts/verify-keyboard-threading.swift \
+		-o /tmp/dictatormd-smoke/verify-keyboard-threading
+
+keyboard-threading-smoke: keyboard-threading-build
+	@/tmp/dictatormd-smoke/verify-keyboard-threading
+	@/tmp/dictatormd-smoke/verify-keyboard-threading --primed
 
 foundations-smoke:
 	@mkdir -p /tmp/dictatormd-smoke

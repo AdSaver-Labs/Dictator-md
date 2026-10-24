@@ -1,5 +1,38 @@
 # Dictation Compatibility Checkpoint
 
+## 1.0.36 Cold-Start Paste Crash
+
+Crash reports from 1.0.33, 1.0.34 and 1.0.35 identified Carbon input-source
+registry calls on a background delivery thread. Recognition had finished; the
+crash occurred while resolving Command-V. A fresh-process detached lookup
+reproduced a registry initialization crash, while a main-thread-primed process
+passed. Warm editor tests alone were insufficient coverage.
+
+All current input-source lookup, property access, key translation and source
+release now occur on the main queue. Delivery itself stays on the background
+serial queue. Synchronous UI-thread delivery is rejected without touching the
+clipboard, avoiding a main/typing-queue deadlock. Do not remove either boundary.
+Production recording, model, recognition, hotkey, signing and permission behavior
+are unchanged. The engine's additional target parameter is test-only.
+
+Local verification on 2026-10-24:
+- 7,200 detached/concurrent keyboard lookups across cold and primed processes,
+  plus main-thread lookup and invalid-caller/deadlock guards, passed.
+- All 19 external-editor delivery checks and five keyboard layouts passed.
+- Four full engine-to-editor checks passed: explicit English/Bulgarian and Auto
+  for both, each using the existing medium model, isolated History, original
+  target restoration and confirmed exact clipboard replacement.
+- Correction, recognition/persistence, language sampling, clipboard ownership,
+  cancellation and language-review recovery checks passed. Universal app built.
+
+`make keyboard-threading-smoke` is now a CI gate and must run in fresh processes.
+`make language-review-engine-build` also builds the opt-in live pipeline test:
+run its executable with the existing model path, synthetic fixture directory and
+`--pipeline`. This temporarily switches disposable windows; coordinate an idle
+desktop first. Its AppKit run loop must remain active for focus notifications.
+These checks do not replace physical microphone/hotkey tests or verification of
+every third-party editor, and do not establish perfect mixed-language accuracy.
+
 ## 1.0.34 Delivery Hardening
 
 - Capture a bounded readable draft in RAM with its original UTF-16 selection.
@@ -54,6 +87,8 @@ also passed. The microphone and ASR implementations were not changed in this sli
    beside the user's existing local transcript, never surrounding editor text.
 6. Run live external-editor tests before installation. Do not rotate signing,
    reset permissions or replace the installed app to make a test appear to pass.
+7. Carbon input-source APIs are main-queue-only. Keep synchronous delivery off
+   the UI thread and test cold starts, not just warmed-up clipboard paths.
 
 Version 1.0.30 repairs regressions introduced by 1.0.29's target verification.
 The recorded destination no longer expires during processing or depends on the

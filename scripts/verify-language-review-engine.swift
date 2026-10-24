@@ -18,8 +18,19 @@ enum AppPaths {
 
 @main
 enum LanguageReviewEngineSmoke {
-    @MainActor static func main() async throws {
-        guard CommandLine.arguments.count == 3 else { fatalError("Expected existing model and fixture directory") }
+    @MainActor static func main() {
+        if CommandLine.arguments.contains("--fixture") { LiveInsertionTest.main(); return }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in
+            do { try await runTests(); exit(0) }
+            catch { fputs("Engine verification failed: \(error)\n", stderr); exit(1) }
+        }
+        app.run()
+    }
+
+    @MainActor private static func runTests() async throws {
+        guard CommandLine.arguments.count >= 3 else { fatalError("Expected existing model and fixture directory") }
         defer { try? FileManager.default.removeItem(at: AppPaths.root) }
         _ = NSApplication.shared
         let previousSoundSetting = UserDefaults.standard.object(forKey: "soundFeedbackEnabled")
@@ -35,6 +46,10 @@ enum LanguageReviewEngineSmoke {
         let boardCount = NSPasteboard.general.changeCount
         let bg = try audio("12.caf")
         let en = try audio("13.caf")
+        if CommandLine.arguments.contains("--pipeline") {
+            try await checkPipeline(engine, english: en, bulgarian: bg)
+            return
+        }
 
         engine.testTranscribe([Float](repeating: 0, count: 16000), language: .auto, forcePreview: false)
         try await waitForPreview(engine)
@@ -75,6 +90,63 @@ enum LanguageReviewEngineSmoke {
         precondition(DictationMemory.shared.history.isEmpty)
         precondition(NSPasteboard.general.changeCount == boardCount, "Review must never touch the clipboard")
         print("Language review engine passed: uncertain Auto, manual EN/BG, retry serialization, expiry, discard, cancellation, stale accept, no history/clipboard delivery.")
+    }
+
+    @MainActor private static func checkPipeline(_ engine: DictationEngine, english: [Float], bulgarian: [Float]) async throws {
+        guard AXIsProcessTrusted() else { fatalError("Pipeline test requires Accessibility permission") }
+        let clipboard = PasteboardSnapshot(pasteboard: .general)
+        let previousApp = NSWorkspace.shared.frontmostApplication
+        let previousPreview = AppSettings.shared.previewBeforeInsert
+        let previousKeep = AppSettings.shared.keepTranscriptOnClipboard
+        AppSettings.shared.previewBeforeInsert = false
+        AppSettings.shared.keepTranscriptOnClipboard = true
+        var processes: [Process] = []
+        defer {
+            for process in processes where process.isRunning { process.terminate() }
+            clipboard.restoreIfUnchanged(expectedChangeCount: NSPasteboard.general.changeCount, after: 0)
+            AppSettings.shared.previewBeforeInsert = previousPreview
+            AppSettings.shared.keepTranscriptOnClipboard = previousKeep
+            previousApp?.activate()
+        }
+        let fixture = try LiveInsertionTest.launchFixture(at: AppPaths.root.appendingPathComponent("editor"), processes: &processes)
+        let cases: [(AppSettings.DictationLanguage, [Float], String)] = [
+            (.english, english, "English"), (.bulgarian, bulgarian, "Bulgarian"),
+            (.auto, english, "English"), (.auto, bulgarian, "Bulgarian")
+        ]
+        for (index, test) in cases.enumerated() {
+            _ = try fixture.command("reset")
+            _ = try fixture.command("clipboardOnly")
+            _ = try fixture.command("focusOriginal")
+            try await Task.sleep(nanoseconds: 250_000_000)
+            let target = FocusTracker.shared.currentInsertionTarget()
+            guard target.app?.processIdentifier == fixture.pid, target.focusedElement != nil else {
+                throw LiveInsertionTest.Failure("Fixture target missing before transcription")
+            }
+            _ = try fixture.command("focusOtherWindow")
+            engine.testTranscribe(test.1, language: test.0, forcePreview: false, target: target)
+            for _ in 0..<1200 {
+                if engine.state == .idle { break }
+                if engine.state == .preview { throw LiveInsertionTest.Failure("Clear synthetic speech unexpectedly required review") }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard engine.state == .idle else { throw LiveInsertionTest.Failure("Pipeline timed out") }
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let history = DictationMemory.shared.history
+            guard history.count == index + 1 else { throw LiveInsertionTest.Failure("History count mismatch") }
+            let item = history[0]
+            guard item.language == test.2, !item.text.isEmpty,
+                  item.delivery?.strategy == "clipboard", item.delivery?.outcome == .confirmed else {
+                throw LiveInsertionTest.Failure("Pipeline language/delivery mismatch: \(item.language), \(String(describing: item.delivery))")
+            }
+            let inserted = item.text + ((item.text.last.map { ".!?。！？".contains($0) } ?? false) ? " " : "")
+            let editor = try fixture.command("snapshot")
+            guard editor["original"] == "Before \(inserted) tail",
+                  editor["other"] == "Other field", editor["otherWindow"] == "Other window" else {
+                throw LiveInsertionTest.Failure("Incorrect original-field paste or changed other field")
+            }
+            print("PASS engine pipeline \(index + 1): \(test.0.rawValue) -> \(test.2), ASR, History, original-field clipboard delivery")
+        }
+        print("All four full engine-to-editor pipeline checks passed; personal History untouched.")
     }
 
     @MainActor private static func waitForPreview(_ engine: DictationEngine) async throws {

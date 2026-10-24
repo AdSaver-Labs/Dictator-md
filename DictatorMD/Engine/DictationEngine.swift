@@ -83,10 +83,10 @@ final class DictationEngine {
         isModelLoaded = true
     }
 
-    func testTranscribe(_ audio: [Float], language: AppSettings.DictationLanguage, forcePreview: Bool) {
+    func testTranscribe(_ audio: [Float], language: AppSettings.DictationLanguage, forcePreview: Bool, target: InsertionTarget? = nil) {
         operationGate = DictationOperationGate()
         operationID = UUID()
-        transcribeCapturedAudio(audio, language: language, target: nil, forcePreview: forcePreview)
+        transcribeCapturedAudio(audio, language: language, target: target, forcePreview: forcePreview)
     }
 
     func testExpireReviewAudio() { expireLanguageReviewAudio() }

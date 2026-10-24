@@ -3,7 +3,9 @@ import Foundation
 import Carbon.HIToolbox
 
 // A disposable external AppKit editor exercises the production injector, not a mock.
+#if !ENGINE_PIPELINE_TESTING
 @main
+#endif
 struct LiveInsertionTest {
     static func main() {
         let app = NSApplication.shared
