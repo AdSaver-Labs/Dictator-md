@@ -49,6 +49,7 @@ SWIFT_FILES := \
 	DictatorMD/UI/FloatingNodeView.swift \
 	DictatorMD/UI/SettingsWindowController.swift \
 	DictatorMD/UI/SettingsView.swift \
+	DictatorMD/UI/DictationReviewView.swift \
 	DictatorMD/UI/OnboardingView.swift \
 	DictatorMD/App/DictatorMDApp.swift
 
@@ -202,6 +203,21 @@ auto-language-smoke:
 	@mkdir -p /tmp/dictatormd-smoke
 	xcrun swiftc DictatorMD/Utilities/Settings.swift DictatorMD/Engine/AutoLanguageDecision.swift scripts/verify-auto-language.swift -o /tmp/dictatormd-smoke/verify-auto-language
 	@/tmp/dictatormd-smoke/verify-auto-language
+
+.PHONY: language-review-engine-build
+language-review-engine-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -D LANGUAGE_REVIEW_TESTING -sdk "$(SDK)" -import-objc-header DictatorMD/DictatorMD-Bridging-Header.h \
+		-I lib -L lib $(LIBS) $(FRAMEWORKS) -parse-as-library \
+		$(filter-out DictatorMD/App/DictatorMDApp.swift DictatorMD/Utilities/AppPaths.swift,$(SWIFT_FILES)) \
+		scripts/verify-language-review-engine.swift -o /tmp/dictatormd-smoke/verify-language-review-engine
+
+.PHONY: language-review-ui-build
+language-review-ui-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -parse-as-library -framework SwiftUI -framework AppKit \
+		DictatorMD/Utilities/Settings.swift DictatorMD/UI/DictationReviewView.swift \
+		scripts/verify-language-review-ui.swift -o /tmp/dictatormd-smoke/verify-language-review-ui
 
 insertion-smoke:
 	xcrun swift scripts/verify-insertion-compatibility.swift

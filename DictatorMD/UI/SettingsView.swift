@@ -116,27 +116,17 @@ struct SettingsView: View {
                 .preferredColorScheme(settings.appearanceMode.preferredColorScheme)
         }
         .sheet(isPresented: Binding(
-            get: { engine.state == .preview && !settings.floatingNodeEnabled },
+            get: { engine.shouldPresentReviewSheet(floatingNodeEnabled: settings.floatingNodeEnabled) },
             set: { if !$0 && engine.state == .preview { engine.discardPreview() } }
         )) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Review dictation")
-                    .font(.headline)
-                TextEditor(text: Binding(
+            DictationReviewView(text: Binding(
                     get: { engine.previewText },
                     set: { engine.previewText = $0 }
-                ))
-                .frame(minHeight: 180)
-                .border(.separator)
-                HStack {
-                    Spacer()
-                    Button("Discard") { engine.discardPreview() }
-                    Button("Insert") { engine.acceptPreview() }
-                        .keyboardShortcut(.return, modifiers: .command)
-                }
-            }
-            .padding(20)
-            .frame(minWidth: 480, minHeight: 280)
+                ), languageMessage: engine.languageReviewMessage,
+                canRetryLanguage: engine.canRetryPreviewLanguage,
+                retry: engine.retryPreviewLanguage,
+                discard: engine.discardPreview,
+                insert: engine.acceptPreview)
         }
         .onAppear {
             if !hasCompletedOnboarding {

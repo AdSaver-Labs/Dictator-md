@@ -54,11 +54,31 @@ These sources establish spelling, not recognition accuracy or medical guidance.
 
 Snapshot the user's Auto/EN/BG choice at recording start. A later settings change
 must not reinterpret the current recording or replace its model while busy.
-Manual EN/BG never invokes language detection. Auto examines a phrase (up to
-eight seconds), then a bounded longer prefix if uncertain; an unsupported Slavic
-classification is never sufficient evidence for Bulgarian. Log unresolved Auto
-fallbacks without transcript/audio. Keep translation disabled. Test language
+Manual EN/BG never invokes language detection. Auto uses a detection-only copy:
+scan at most the first 60 seconds for sustained non-silent audio, keep 300 ms
+pre-roll, and examine eight seconds followed by at most thirty if uncertain.
+Conservative energy gating is not a learned voice detector; it may retain noise.
+Detection gain is bounded to 8x. Never trim or amplify the actual decode buffer
+through this sampling step. An unsupported Slavic classification is never
+sufficient evidence for Bulgarian. Keep translation disabled. Test language
 choice separately from word accuracy, including borrowed first words and noise.
+
+## Uncertain Language Recovery
+
+- An unresolved Auto decision produces an English *draft*, not an English lock.
+  Require review before insertion, including when the draft is empty.
+- The review window offers explicit EN/BG re-transcription with the same model
+  and original audio. A retry returns to review, never automatically inserts.
+- Keep the original target snapshot. Never recapture focus from the review UI.
+- Retain audio only in RAM for five minutes from the first review; retries do
+  not extend the deadline. The retention cap is ten minutes of 16 kHz Float32
+  audio (38.4 MB). Longer recordings still have an editable draft, without retry.
+- Clear retained audio on Insert, Discard, Escape, expiry and the next recording.
+  Expiry keeps the editable draft and disables retry. In-flight inference can
+  finish using its local copy; cancelled results must fail the operation gate.
+- Each retry invalidates older callbacks. Accept only from the preview state,
+  record History once on acceptance and use the unchanged delivery routine.
+- Logs contain timing/probabilities/status, never microphone samples or text.
 
 ## Bounded Rechecks
 
@@ -94,6 +114,16 @@ Use the same recordings for before/after comparisons. Track English and
 Bulgarian separately: raw word errors, exact specialist terms, language choice,
 latency, repetitions and numerical changes. Synthetic speech is a smoke test,
 not evidence of performance on a particular user's accent, slang or whispers.
+Repeat with `DICTATOR_TEST_VAD=1` to exercise the installed VAD when available;
+the default no-VAD run is a separate silence/quiet-audio stress test.
 Add failed real recordings only with explicit consent and anonymization.
+`make auto-language-smoke` also tests sampling bounds, quiet openings and RAM
+expiry. `make language-review-engine-build` builds an isolated engine test; run
+its `/tmp/dictatormd-smoke/verify-language-review-engine` executable with the same
+model and fixture directory. It exercises review, retry, discard, expiry,
+cancellation and the absence of pre-acceptance History/clipboard delivery.
+Its test-only entry points are excluded from production builds and its storage
+root is temporary. `make language-review-ui-build` renders the production review
+view with inert callbacks for compact/expanded UI and button checks.
 Before handoff verify the correction controls in the installed app and run a
 real external-editor insertion smoke test with unchanged production delivery.

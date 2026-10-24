@@ -300,7 +300,12 @@ struct FloatingNodeView: View {
             }
 
             HStack(spacing: 8) {
-                languageButton
+                if engine.state == .preview, engine.languageReviewMessage != nil {
+                    Button("Review language") { SettingsWindowController.shared.show(engine: engine) }
+                        .buttonStyle(.borderless)
+                } else {
+                    languageButton
+                }
                 if engine.state == .preview {
                     Button("Discard") { engine.discardPreview() }
                         .buttonStyle(.borderless)

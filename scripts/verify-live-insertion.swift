@@ -28,7 +28,9 @@ struct LiveInsertionTest {
             }
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    if CommandLine.arguments.contains("--surface-check") {
+                    if CommandLine.arguments.contains("--fixture-capabilities") {
+                        try checkFixtureCapabilities()
+                    } else if CommandLine.arguments.contains("--surface-check") {
                         try runSurfaceCheck()
                     } else if CommandLine.arguments.contains("--browser-check") {
                         try runBrowserCheck()
@@ -192,6 +194,7 @@ struct LiveInsertionTest {
     }
 
     static func runTests() throws {
+        try checkFixtureCapabilities()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("dictatormd-live-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let originalClipboard = PasteboardSnapshot(pasteboard: .general)
@@ -208,8 +211,9 @@ struct LiveInsertionTest {
         let second = try launchFixture(at: root.appendingPathComponent("second"), processes: &processes)
         let injector = TextInjector()
 
-        func capture() throws -> InsertionTarget {
+        func capture(mode: String? = nil) throws -> InsertionTarget {
             _ = try first.command("reset")
+            if let mode { _ = try first.command(mode) }
             _ = try first.command("focusOriginal")
             var target: InsertionTarget?
             DispatchQueue.main.sync { target = FocusTracker.shared.currentInsertionTarget() }
@@ -329,17 +333,21 @@ struct LiveInsertionTest {
         }
         print("PASS refused selection restoration leaves destination unchanged")
 
-        target = try capture()
-        _ = try first.command("delayAX")
+        target = try capture(mode: "delayAX")
         try assertInserted("Delayed edit", outcome: injector.insert(text: "Delayed edit", target: target), label: "delayed AX acknowledgement readback")
 
-        target = try capture()
-        _ = try first.command("clipboardOnly")
-        try assertInserted("Clipboard exact edit", outcome: injector.insert(text: "Clipboard exact edit", target: target), label: "clipboard exact selection replacement")
+        target = try capture(mode: "clipboardOnly")
+        var canWriteText = DarwinBoolean(true)
+        guard let field = target.focusedElement,
+              AXUIElementIsAttributeSettable(field, kAXSelectedTextAttribute as CFString, &canWriteText) == .success,
+              !canWriteText.boolValue else { throw Failure("clipboard fixture must advertise read-only AX text") }
+        let clipboardEdit = injector.insertWithDelivery(text: "Clipboard exact edit", target: target)
+        guard clipboardEdit.strategy == "clipboard" else { throw Failure("fixture did not exercise the clipboard path") }
+        try assertInserted("Clipboard exact edit", outcome: clipboardEdit.outcome, label: "clipboard exact selection replacement")
 
-        target = try capture()
-        _ = try first.command("copyDuringPaste")
+        target = try capture(mode: "copyDuringPaste")
         let copyResult = injector.insertWithDelivery(text: "Keep the new copy", target: target)
+        guard copyResult.strategy == "clipboard" else { throw Failure("copy-during-paste fixture bypassed the clipboard path") }
         try assertInserted("Keep the new copy", outcome: copyResult.outcome, label: "new user copy during receiver paste")
         guard copyResult.outcome == .confirmed else { throw Failure("clipboard readback was not confirmed") }
         Thread.sleep(forTimeInterval: 2.25)
@@ -369,6 +377,43 @@ struct LiveInsertionTest {
 
         try checkDeliveryContracts()
         print("All 19 live insertion checks passed using the production TextInjector.")
+    }
+
+    // Validate the fixture through the same remote AX API without activating
+    // a window, touching focus, posting keys or changing the user's clipboard.
+    static func checkFixtureCapabilities() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("dictatormd-capabilities-\(UUID())")
+        var processes = [Process]()
+        defer {
+            for process in processes where process.isRunning { process.terminate() }
+            try? FileManager.default.removeItem(at: root)
+        }
+        let fixture = try launchFixture(at: root, processes: &processes)
+        _ = try fixture.command("showWithoutFocus")
+        func originalField(_ element: AXUIElement, depth: Int = 0) -> AXUIElement? {
+            guard depth < 8 else { return nil }
+            var identifier: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXIdentifierAttribute as CFString, &identifier)
+            if identifier as? String == "dictatormd-original" { return element }
+            var children: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
+            for child in children as? [AXUIElement] ?? [] {
+                if let field = originalField(child, depth: depth + 1) { return field }
+            }
+            return nil
+        }
+        for mode in ["reset", "clipboardOnly", "copyDuringPaste"] {
+            _ = try fixture.command(mode)
+            guard let field = originalField(AXUIElementCreateApplication(fixture.pid)) else {
+                throw Failure("offscreen fixture field unavailable")
+            }
+            var writable = DarwinBoolean(false)
+            let result = AXUIElementIsAttributeSettable(field, kAXSelectedTextAttribute as CFString, &writable)
+            guard result == .success, writable.boolValue == (mode == "reset") else {
+                throw Failure("fixture mode=\(mode) AX writable=\(writable.boolValue) status=\(result.rawValue)")
+            }
+            print("PASS remote fixture capability \(mode): writable=\(writable.boolValue)")
+        }
     }
 
     struct Failure: Error, CustomStringConvertible {
@@ -440,6 +485,7 @@ final class EditorFixture {
                 let view = FixtureTextView(frame: NSRect(x: 20, y: 20 + number * 130, width: 550, height: 100))
                 view.isRichText = false
                 view.font = .systemFont(ofSize: 16)
+                if index == 0 && number == 0 { view.setAccessibilityIdentifier("dictatormd-original") }
                 window.contentView!.addSubview(view)
                 fields.append(view)
             }
@@ -456,6 +502,7 @@ final class EditorFixture {
         lastRequest = id
         switch command["action"] {
         case "reset":
+            if fields[0] is DelayedFixtureTextView { replaceOriginal(delayed: false) }
             fields.forEach { $0.mode = "normal" }
             fields[0].string = "Before AFTER tail"
             fields[1].string = "Other field"
@@ -469,10 +516,13 @@ final class EditorFixture {
         case "rejectSelection":
             fields[0].setSelectedRange(NSRange(location: 0, length: 0))
             fields[0].mode = "rejectSelection"
-        case "delayAX": fields[0].mode = "delayAX"
+        case "delayAX": replaceOriginal(delayed: true)
         case "clipboardOnly": fields[0].mode = "clipboardOnly"
         case "copyDuringPaste": fields[0].mode = "copyDuringPaste"
         case "closeOriginal": windows[0].close()
+        case "showWithoutFocus":
+            windows[0].setFrameOrigin(NSPoint(x: -10000, y: -10000))
+            windows[0].orderBack(nil)
         case "focusSecure":
             NSApp.activate(ignoringOtherApps: true)
             windows[1].makeKeyAndOrderFront(nil)
@@ -491,33 +541,53 @@ final class EditorFixture {
         windows[window].makeFirstResponder(fields[field])
         fields[field].setSelectedRange(NSRange(location: field == 0 ? 7 : fields[field].string.utf16.count, length: field == 0 ? 5 : 0))
     }
+
+    private func replaceOriginal(delayed: Bool) {
+        let old = fields[0]
+        let replacement = delayed ? DelayedFixtureTextView(frame: old.frame) : FixtureTextView(frame: old.frame)
+        replacement.isRichText = false
+        replacement.font = old.font
+        replacement.string = old.string
+        replacement.setAccessibilityIdentifier("dictatormd-original")
+        old.removeFromSuperview()
+        windows[0].contentView!.addSubview(replacement)
+        fields[0] = replacement
+    }
 }
 
-final class FixtureTextView: NSTextView {
-    var mode = "normal"
-
-    override func accessibilityIsAttributeSettable(_ attribute: NSAccessibility.Attribute) -> Bool {
-        if ["clipboardOnly", "copyDuringPaste"].contains(mode), attribute == .selectedText { return false }
-        return super.accessibilityIsAttributeSettable(attribute)
+class FixtureTextView: NSTextView {
+    var mode = "normal" {
+        didSet { isEditable = !isClipboardOnly }
     }
+    private var isClipboardOnly: Bool { ["clipboardOnly", "copyDuringPaste"].contains(mode) }
 
     override func setAccessibilitySelectedTextRange(_ range: NSRange) {
         if mode != "rejectSelection" { super.setAccessibilitySelectedTextRange(range) }
     }
 
-    override func setAccessibilitySelectedText(_ text: String?) {
-        if mode == "delayAX" {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { super.setAccessibilitySelectedText(text) }
-        } else {
-            super.setAccessibilitySelectedText(text)
-        }
-    }
-
     override func paste(_ sender: Any?) {
+        // Model editors that expose read-only AX text but accept Paste through
+        // their own editing command. AppKit must report the real AX capability.
+        let wasEditable = isEditable
+        isEditable = true
         super.paste(sender)
+        isEditable = wasEditable
         if mode == "copyDuringPaste" {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString("New copy during paste", forType: .string)
         }
+    }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if isClipboardOnly, item.action == #selector(paste(_:)) { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+}
+
+// Overriding the modern setter makes AppKit advertise it as writable even for
+// noneditable views. Keep this override out of the clipboard-only fixture class.
+final class DelayedFixtureTextView: FixtureTextView {
+    override func setAccessibilitySelectedText(_ text: String?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { super.setAccessibilitySelectedText(text) }
     }
 }

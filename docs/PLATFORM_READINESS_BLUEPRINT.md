@@ -106,9 +106,46 @@ license and attribution review; a free download does not make code unrestricted.
 - [x] Resolve the paste key using the current Command-modified keyboard layout.
   No arbitrary US-key fallback. Add US, Dvorak, French and two Bulgarian checks.
 
-Auto still falls back to English when the available evidence remains uncertain.
-This is not a guarantee for one-word, whispered or mixed-language speech. A
-recoverable language-review flow is the next step, not stronger forced guessing.
+In 1.0.33/1.0.34 Auto still fell back to English when evidence remained uncertain.
+The 1.0.35 recovery below replaces silent insertion of that fallback. This is not
+a guarantee for one-word, whispered or mixed-language speech.
+
+#### Language Reliability in 1.0.35
+
+Verified locally on 2026-10-24: all nineteen live insertion checks passed with
+the unchanged production injector, including exact clipboard replacement,
+original-target restoration, delayed AX readback, newer-copy preservation and
+secure-field exclusion. The disposable editor's delayed-write setter override
+had made AppKit advertise writable AX text in clipboard-only mode; it now lives
+in a separate fixture class. An offscreen prerequisite checks remote AX
+capabilities before live tests touch focus or clipboard. Point-only targets
+remain sent-unverified in production even when fixture readback proves delivery;
+these tests do not establish compatibility with every third-party editor.
+
+- Detection-only sampling skips leading near-silence, keeps quiet openings and
+  pre-roll, and bounds gain, scan duration and sample size. Full transcription
+  still uses the original recording, and translation remains disabled.
+- Uncertain Auto results require review. Explicit EN/BG retries reuse RAM audio
+  with a five-minute deadline and ten-minute recording cap. Review retains the
+  captured destination; only Insert uses the established delivery routine.
+- Retry, expiry, discard, cancellation and stale acceptance have isolated real
+  engine checks. Recovery never saves audio to disk or downloads another model.
+  Review-sheet presentation is checked with the floating node both enabled and
+  disabled, including processing and expired-audio states.
+- Forty deterministic language/sampling/retention checks and sixteen synthetic
+  audio cases cover manual profiles, borrowed openings, quiet speech and long
+  leading silence. On the existing medium model the old code selected English
+  for Bulgarian after 32 seconds of silence; the new code selected Bulgarian.
+  Language selection improved from 15/16 to 16/16 in this small synthetic set.
+  This does not establish real-user accuracy: word errors remain, and the
+  no-VAD stress test still hallucinated words during a long silent lead-in.
+  With the existing Silero VAD enabled, all sixteen language choices and 27
+  specialist/number terms passed; the long-silence cases had no added prefix.
+
+Still open: real-user accent/noise evaluation with consent, low-confidence word
+review, context-sensitive code-switching and retry after an already-sent result.
+No focus, clipboard, signing, permissions or microphone implementation changes
+belong to this language slice.
 
 #### Prioritized Remaining Improvements
 

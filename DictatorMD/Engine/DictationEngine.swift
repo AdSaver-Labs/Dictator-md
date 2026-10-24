@@ -19,6 +19,11 @@ final class DictationEngine {
     private(set) var userFacingError: String?
     private(set) var partialTranscription: String = ""
     var previewText: String = ""
+    private(set) var languageReviewMessage: String?
+    var canRetryPreviewLanguage: Bool { pendingLanguageAudio?.samples() != nil }
+    func shouldPresentReviewSheet(floatingNodeEnabled: Bool) -> Bool {
+        state == .preview && (!floatingNodeEnabled || languageReviewMessage != nil)
+    }
     private(set) var canUndoLastInsertion = false
 
     /// True while the user is holding the hotkey but the toggle-mode threshold hasn't yet fired.
@@ -42,6 +47,8 @@ final class DictationEngine {
     private var pendingPreviewAudioDuration: Double = 0
     private var pendingPreviewCleanupCutCount: Int = 0
     private var pendingPreviewRawText: String?
+    private var pendingLanguageAudio: LanguageReviewAudio?
+    private var languageReviewExpiryTimer: Timer?
     private var operationID = UUID()
     private var operationGate = DictationOperationGate()
     private var escapeMonitor: Any?
@@ -69,6 +76,22 @@ final class DictationEngine {
     private let quickTapMaxDuration: TimeInterval = 0.24
     private let doubleTapInterval: TimeInterval = 0.42
 
+    #if LANGUAGE_REVIEW_TESTING
+    // Test-only entry points skip microphones, global hooks, windows and delivery.
+    init(testBridge: WhisperBridge) {
+        whisperBridge = testBridge
+        isModelLoaded = true
+    }
+
+    func testTranscribe(_ audio: [Float], language: AppSettings.DictationLanguage, forcePreview: Bool) {
+        operationGate = DictationOperationGate()
+        operationID = UUID()
+        transcribeCapturedAudio(audio, language: language, target: nil, forcePreview: forcePreview)
+    }
+
+    func testExpireReviewAudio() { expireLanguageReviewAudio() }
+    #endif
+
     init() {
         let axTrusted = AXIsProcessTrusted()
         fputs("[DictationEngine] Init. Accessibility: \(axTrusted)\n", stderr)
@@ -87,6 +110,7 @@ final class DictationEngine {
     }
 
     deinit {
+        languageReviewExpiryTimer?.invalidate()
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
         if let localEscapeMonitor { NSEvent.removeMonitor(localEscapeMonitor) }
     }
@@ -382,6 +406,7 @@ final class DictationEngine {
         userFacingError = nil
         partialTranscription = ""
         previewText = ""
+        clearPendingPreview()
         canUndoLastInsertion = false
         insertionTarget = currentInsertionTarget()
         insertionTargetApp = insertionTarget?.app
@@ -414,8 +439,7 @@ final class DictationEngine {
         }
         partialTranscription = ""
         previewText = ""
-        pendingPreviewTarget = nil
-        pendingPreviewLanguage = nil
+        clearPendingPreview()
         insertionTarget = nil
         insertionTargetApp = nil
         userFacingError = state == .typing
@@ -471,6 +495,45 @@ final class DictationEngine {
         state = .idle
     }
 
+    func retryPreviewLanguage(_ language: AppSettings.DictationLanguage) {
+        guard state == .preview, language != .auto else { return }
+        guard let retained = pendingLanguageAudio, let audio = retained.samples() else {
+            expireLanguageReviewAudio()
+            return
+        }
+        let target = pendingPreviewTarget
+        clearPendingPreview()
+        operationGate.cancel()
+        operationGate = DictationOperationGate()
+        operationID = UUID()
+        transcribeCapturedAudio(audio, language: language, target: target,
+                                reviewAudio: retained, forcePreview: true)
+    }
+
+    private func retainLanguageReviewAudio(_ audio: [Float], previous: LanguageReviewAudio?, uncertain: Bool) {
+        pendingLanguageAudio = previous ?? LanguageReviewAudio(audio)
+        languageReviewMessage = uncertain
+            ? "Auto could not confidently distinguish English from Bulgarian. Nothing has been pasted."
+            : "Review this transcription before inserting it."
+        guard let retained = pendingLanguageAudio, retained.samples() != nil else {
+            expireLanguageReviewAudio()
+            return
+        }
+        languageReviewExpiryTimer?.invalidate()
+        let timer = Timer(timeInterval: max(0.01, retained.expiresAt.timeIntervalSinceNow), repeats: false) { [weak self] _ in
+            self?.expireLanguageReviewAudio()
+        }
+        languageReviewExpiryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func expireLanguageReviewAudio() {
+        pendingLanguageAudio = nil
+        languageReviewExpiryTimer?.invalidate()
+        languageReviewExpiryTimer = nil
+        languageReviewMessage = "Audio retry is unavailable or expired. You can still edit and insert the draft, or record again with EN or BG selected."
+    }
+
     func undoLastInsertion() {
         userFacingError = "Automatic undo is unavailable because the destination may have changed. Your text is in History."
     }
@@ -490,6 +553,10 @@ final class DictationEngine {
     }
 
     private func clearPendingPreview() {
+        pendingLanguageAudio = nil
+        languageReviewExpiryTimer?.invalidate()
+        languageReviewExpiryTimer = nil
+        languageReviewMessage = nil
         pendingPreviewTarget = nil
         pendingPreviewLanguage = nil
         pendingPreviewAudioDuration = 0
@@ -545,16 +612,26 @@ final class DictationEngine {
             return
         }
 
+        transcribeCapturedAudio(audioBuffer, language: recordingLanguage, target: insertionTarget)
+    }
+
+    private func transcribeCapturedAudio(
+        _ audioBuffer: [Float],
+        language: AppSettings.DictationLanguage,
+        target: InsertionTarget?,
+        reviewAudio: LanguageReviewAudio? = nil,
+        forcePreview: Bool = false
+    ) {
         let audioDuration = Double(audioBuffer.count) / 16000.0
         state = .processing
         partialTranscription = ""
+        userFacingError = nil
         let currentOperationID = operationID
         let gate = operationGate
 
         let bridge = self.whisperBridge
         // A language switch in the UI applies to the next recording, not audio
         // already captured with this operation's model and destination.
-        let language = recordingLanguage
         let basePrompt = AppSettings.shared.vocabularyPrompt
         let customTerms = AppSettings.shared.customTerms
         let learnedTerms = DictationMemory.shared.topPromptTerms(for: language)
@@ -570,7 +647,6 @@ final class DictationEngine {
             learnedTerms: learnedTerms, basePrompt: basePrompt)
         let injector = self.textInjector
         let feedback = self.soundFeedback
-        let target = self.insertionTarget
         let targetApp = target?.app
 
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -610,7 +686,7 @@ final class DictationEngine {
                     DebugLog.shared.log("[DictationEngine] retryWithoutVAD audioDuration=\(String(format: "%.2f", audioDuration)) rms=\(String(format: "%.5f", voiceEnergy.rms)) peak=\(String(format: "%.5f", voiceEnergy.peak))")
                     transcription = bridge.transcribe(
                         audioBuffer: audioBuffer,
-                        language: transcription.language,
+                        language: transcription.requiresLanguageReview ? language : transcription.language,
                         useVAD: false,
                         vocabulary: vocabulary,
                         recheckUncertainSegments: recognitionRecheckEnabled
@@ -620,6 +696,7 @@ final class DictationEngine {
                 }
             }
 
+            let requiresLanguageReview = transcription.requiresLanguageReview
             if Self.shouldRetryForLanguageViolation(transcription.text, language: transcription.language) {
                 let fallbackLanguage = Self.fallbackLanguage(for: transcription.language)
                 DebugLog.shared.log("[DictationEngine] retryLanguageViolation requested=\(language.whisperCode) fallback=\(fallbackLanguage.whisperCode)")
@@ -646,8 +723,8 @@ final class DictationEngine {
                 return
             }
 
-            if !Self.isLikelySilenceHallucination(fullText, audioDuration: audioDuration), !fullText.isEmpty {
-                if AppSettings.shared.previewBeforeInsert {
+            if requiresLanguageReview || forcePreview || (!Self.isLikelySilenceHallucination(fullText, audioDuration: audioDuration) && !fullText.isEmpty) {
+                if requiresLanguageReview || forcePreview || AppSettings.shared.previewBeforeInsert {
                     await MainActor.run { [weak self] in
                         guard let self, gate.isActive, self.operationID == currentOperationID else { return }
                         self.previewText = fullText
@@ -657,12 +734,18 @@ final class DictationEngine {
                         self.pendingPreviewAudioDuration = audioDuration
                         self.pendingPreviewCleanupCutCount = cleanupCutCount
                         self.pendingPreviewRawText = rawText
+                        if requiresLanguageReview || forcePreview {
+                            self.retainLanguageReviewAudio(audioBuffer, previous: reviewAudio, uncertain: requiresLanguageReview)
+                        }
                         self.state = .preview
+                        #if !LANGUAGE_REVIEW_TESTING
                         if AppSettings.shared.floatingNodeEnabled {
                             FloatingNodeController.shared.setPresentation(.preview)
-                        } else {
+                        }
+                        if requiresLanguageReview || forcePreview || !AppSettings.shared.floatingNodeEnabled {
                             SettingsWindowController.shared.show(engine: self)
                         }
+                        #endif
                     }
                     return
                 }

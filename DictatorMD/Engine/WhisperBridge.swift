@@ -36,6 +36,7 @@ final class WhisperBridge: @unchecked Sendable {
     struct Transcription {
         let text: String
         let language: AppSettings.DictationLanguage
+        var requiresLanguageReview: Bool = false
     }
 
     private let context: OpaquePointer
@@ -127,12 +128,14 @@ final class WhisperBridge: @unchecked Sendable {
                 ? max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
                 : max(1, ProcessInfo.processInfo.activeProcessorCount)
 
-            let effectiveLanguage = Self.resolveLanguage(
+            let resolvedLanguage = Self.resolveLanguage(
                 requestedLanguage: language,
                 audioBuffer: audioBuffer,
                 context: context,
                 threadCount: threadCount
             )
+            // An English draft is recoverable, but is not a confident Auto decision.
+            let effectiveLanguage = resolvedLanguage ?? .english
             let hintContext = vocabulary ?? RecognitionVocabulary.Context(basePrompt: prompt)
             let decodePrompt = recognitionPrompt(hintContext, language: effectiveLanguage)
             DebugLog.shared.log("[WhisperBridge] vocabularyTokens=\(tokenCount(decodePrompt)) budget=216")
@@ -204,7 +207,7 @@ final class WhisperBridge: @unchecked Sendable {
             guard result == 0 else {
                 fputs("[WhisperBridge] Failed (\(result)) in \(String(format: "%.2f", elapsed))s\n", stderr)
                 DebugLog.shared.log("[WhisperBridge] failed code=\(result) elapsed=\(String(format: "%.2f", elapsed))")
-                return Transcription(text: "", language: effectiveLanguage)
+                return Transcription(text: "", language: effectiveLanguage, requiresLanguageReview: resolvedLanguage == nil)
             }
 
             // Copy segment data before another whisper_full call overwrites the context.
@@ -241,7 +244,7 @@ final class WhisperBridge: @unchecked Sendable {
 
             let trimmed = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
             DebugLog.shared.log("[WhisperBridge] done elapsed=\(String(format: "%.2f", elapsed)) segments=\(segmentCount) length=\(trimmed.count)")
-            return Transcription(text: trimmed, language: effectiveLanguage)
+            return Transcription(text: trimmed, language: effectiveLanguage, requiresLanguageReview: resolvedLanguage == nil)
         }
     }
 
@@ -324,7 +327,7 @@ final class WhisperBridge: @unchecked Sendable {
         audioBuffer: [Float],
         context: OpaquePointer,
         threadCount: Int
-    ) -> AppSettings.DictationLanguage {
+    ) -> AppSettings.DictationLanguage? {
         switch requestedLanguage {
         case .english, .bulgarian:
             return requestedLanguage
@@ -332,13 +335,16 @@ final class WhisperBridge: @unchecked Sendable {
             break
         }
 
+        if whisper_is_multilingual(context) == 0 { return .english }
         let maxLanguageID = whisper_lang_max_id()
-        guard maxLanguageID > 0 else { return .english }
+        guard maxLanguageID > 0, let sample = AutoLanguageSample.prepare(audioBuffer) else { return nil }
+        let detectionAudio = sample.samples
+        DebugLog.shared.log("[WhisperBridge] detectionSample offsetSeconds=\(String(format: "%.2f", Double(sample.offset) / 16000)) gain=\(String(format: "%.2f", sample.gain))")
         let englishID = whisper_lang_id("en")
         let bulgarianID = whisper_lang_id("bg")
         // A greeting or one borrowed word is too little evidence for locking a
         // long prompt. Use a phrase, then broaden only if it remains uncertain.
-        let openingSamples = min(audioBuffer.count, 8 * 16000)
+        let openingSamples = min(detectionAudio.count, 8 * 16000)
         var cachedDetection: (sampleCount: Int, english: Float, bulgarian: Float, top: String)?
 
         func detect(sampleCount: Int, requireStrongEvidence: Bool) -> AppSettings.DictationLanguage? {
@@ -350,7 +356,7 @@ final class WhisperBridge: @unchecked Sendable {
                     requireStrongEvidence: requireStrongEvidence
                 )
             }
-            let melStatus = audioBuffer.withUnsafeBufferPointer { ptr in
+            let melStatus = detectionAudio.withUnsafeBufferPointer { ptr in
                 whisper_pcm_to_mel(context, ptr.baseAddress, Int32(sampleCount), Int32(threadCount))
             }
             guard melStatus == 0 else {
@@ -382,11 +388,11 @@ final class WhisperBridge: @unchecked Sendable {
            let openingLanguage = detect(sampleCount: openingSamples, requireStrongEvidence: true) {
             return openingLanguage
         }
-        if let fullLanguage = detect(sampleCount: min(audioBuffer.count, 30 * 16000), requireStrongEvidence: false) {
+        if let fullLanguage = detect(sampleCount: detectionAudio.count, requireStrongEvidence: false) {
             return fullLanguage
         }
-        DebugLog.shared.log("[WhisperBridge] autoDetection unresolved; using English fallback (manual EN/BG overrides Auto)")
-        return .english
+        DebugLog.shared.log("[WhisperBridge] autoDetection unresolved; English draft requires review before delivery")
+        return nil
     }
 
     private static func probability(_ probabilities: [Float], id: Int32) -> Float {
