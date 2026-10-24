@@ -299,7 +299,8 @@ You hold a key and speak
          |                  Hallucination suppression via regex
     [TextCorrector]         Fixes capitalization, acronyms, punctuation
          |
-    [CGEvent]               Types text at cursor position in any app
+    [TextInjector]          Restores the captured destination, inserts via AX or
+         |                  clipboard paste, verifies delivery where readable
          |
 You see the text appear
 ```
@@ -313,7 +314,7 @@ DictationEngine (@Observable state machine)
   |-- AudioCapture      AVAudioEngine -> 16kHz mono Float32 buffer
   |-- WhisperBridge     C bridging header -> whisper_full() with beam search
   |-- TextCorrector     Rule-based grammar, casing, punctuation (<5ms)
-  |-- TextInjector      CGEvent keyboardSetUnicodeString (works in any app)
+  |-- TextInjector      Captured-target AX/clipboard delivery with guarded recovery
   |-- SoundFeedback     NSSound system audio cues
 ```
 
@@ -353,7 +354,7 @@ Dictator-md/
     AudioCapture.swift         AVAudioEngine mic recording + resampling
     WhisperBridge.swift        Swift wrapper for whisper.cpp C API
     TextCorrector.swift        Rule-based grammar/casing/punctuation
-    TextInjector.swift         CGEvent text typing at cursor
+    TextInjector.swift         Guarded AX/clipboard insertion at the captured target
     DictationEngine.swift      State machine orchestrating everything
     ModelManager.swift         Model download + selection
     SoundFeedback.swift        Audio cue playback

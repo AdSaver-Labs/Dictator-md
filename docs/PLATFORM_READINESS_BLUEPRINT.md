@@ -112,7 +112,16 @@ recoverable language-review flow is the next step, not stronger forced guessing.
 
 #### Prioritized Remaining Improvements
 
-The following are proposed work, not shipped features. Preserve visual design.
+1.0.34 implements the first delivery slice: local per-item outcome/strategy/reason/
+timing, History Copy and explanations, bounded original-draft snapshots,
+selection validation, exact readback, secure-field exclusion and clipboard-owner
+protection. Native lifecycle/race tests and an actual Hermes app-switch test passed.
+See `DICTATION_COMPATIBILITY.md` for evidence and limitations. This is not completion
+of every P0 item: diagnostic export, explicit retry/retranscription, all editor
+adapters and a complete navigation/minimized/recreated-window matrix remain open.
+
+The following is the overall backlog; the delivery items are partially shipped
+as described above, not universally completed. Preserve visual design.
 No new model or cloud service is required for P0/P1 unless explicitly stated.
 
 | Priority | Improvement | Acceptance gate |

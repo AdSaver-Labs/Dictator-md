@@ -3,14 +3,6 @@ import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
 
-enum InsertionOutcome {
-    case confirmed
-    case sentUnverified
-    case failed
-
-    var wasSent: Bool { self != .failed }
-}
-
 final class TextInjector {
     private let source: CGEventSource?
     private let typingQueue = DispatchQueue(label: "com.DictatorMD.typing", qos: .userInteractive)
@@ -21,13 +13,28 @@ final class TextInjector {
     }
 
     func insert(text: String, target: InsertionTarget? = nil, shouldProceed: () -> Bool = { true }) -> InsertionOutcome {
+        insertWithDelivery(text: text, target: target, shouldProceed: shouldProceed).outcome
+    }
+
+    func insertWithDelivery(text: String, target: InsertionTarget? = nil, shouldProceed: () -> Bool = { true }) -> InsertionDelivery {
+        let started = ProcessInfo.processInfo.systemUptime
         let prepared = prepareForInsertion(text)
-        guard !prepared.isEmpty, shouldProceed() else { return .failed }
+        guard !prepared.isEmpty, shouldProceed() else {
+            return InsertionDelivery(outcome: .failed, strategy: "none", reason: "cancelled", durationMilliseconds: 0)
+        }
         DebugLog.shared.log("[TextInjector] insert length=\(prepared.count) target=\(target?.appName ?? "nil") bundle=\(target?.bundleIdentifier ?? "nil") hasElement=\(target?.focusedElement != nil)")
 
         return typingQueue.sync {
             let clipboardAtStart = NSPasteboard.general.changeCount
             var outcome = InsertionOutcome.failed
+            var strategy = "none"
+            func finish(_ result: InsertionOutcome, _ reason: String) -> InsertionDelivery {
+                outcome = result
+                let delivery = InsertionDelivery(outcome: result, strategy: strategy, reason: reason,
+                    durationMilliseconds: Int((ProcessInfo.processInfo.systemUptime - started) * 1000))
+                DebugLog.shared.log("[TextInjector] delivery outcome=\(result.rawValue) strategy=\(strategy) reason=\(reason) ms=\(delivery.durationMilliseconds)")
+                return delivery
+            }
             defer {
                 if outcome != .confirmed, shouldProceed(),
                    NSPasteboard.general.changeCount == clipboardAtStart {
@@ -38,38 +45,36 @@ final class TextInjector {
             }
             guard AXIsProcessTrusted() else {
                 DebugLog.shared.log("[TextInjector] AX not trusted; cannot verify destination")
-                return .failed
+                return finish(.failed, "permissionMissing")
+            }
+            if let reason = destinationConflict(target, checkSelection: false) {
+                return finish(.failed, reason)
             }
             guard shouldProceed(), restoreTargetIfNeeded(target) else {
                 DebugLog.shared.log("[TextInjector] destinationRestore failed")
-                return .failed
+                return finish(.failed, shouldProceed() ? "destinationUnavailable" : "cancelled")
+            }
+            if let reason = destinationConflict(target, checkSelection: false) {
+                return finish(.failed, reason)
             }
 
+            strategy = "accessibility"
             if !requiresClipboardPaste(target),
                let directResult = insertDirectlyWithAccessibility(text: prepared, target: target, shouldProceed: shouldProceed) {
-                outcome = directResult
-                return outcome
+                return finish(directResult, directResult == .confirmed ? "verified" : "readbackUnavailable")
             }
 
             if shouldProceed(), restoreClickAnchorIfNeeded(target), verifyTargetFocus(target) {
+                if let reason = destinationConflict(target, checkSelection: true) { return finish(.failed, reason) }
+                strategy = "clipboard"
                 let pasteResult = pasteWithClipboard(text: prepared, target: target, restoreClipboard: shouldRestoreClipboardAfterDictation, shouldProceed: shouldProceed)
-                if pasteResult.wasSent {
-                    outcome = pasteResult
-                    return outcome
-                }
-            }
-
-            if let element = target?.focusedElement, shouldProceed(), verifyTargetFocus(target) {
-                let before = readableValue(of: element)
-                if typeUnicode(text: prepared, shouldProceed: shouldProceed, target: target) {
-                    outcome = confirmedChange(before: before, after: readableValue(of: element), insertedText: prepared)
-                        ? .confirmed : .sentUnverified
-                    return outcome
-                }
+                // Once clipboard delivery is attempted, preserve its result. A
+                // new user copy or lost focus is not permission to type instead.
+                return finish(pasteResult.outcome, pasteResult.reason)
             }
 
             DebugLog.shared.log("[TextInjector] no verified target for insertion; transcript remains in history")
-            return .failed
+            return finish(.failed, shouldProceed() ? "destinationUnavailable" : "cancelled")
         }
     }
 
@@ -143,6 +148,7 @@ final class TextInjector {
     private func verifyTargetFocus(_ target: InsertionTarget?) -> Bool {
         guard let target, let app = target.app, verifyTargetWindow(target) else { return false }
         guard let expected = target.focusedElement else {
+            if let current = FocusTracker.focusedElement(in: app), FocusTracker.isSecureField(current) { return false }
             return target.clickAnchor != nil && target.focusedWindow != nil
         }
         guard let focused = FocusTracker.focusedElement(in: app), CFEqual(expected, focused) else { return false }
@@ -202,6 +208,9 @@ final class TextInjector {
             DebugLog.shared.log("[TextInjector] directAX skipped noFocusedElement")
             return nil
         }
+        var canSetSelection = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &canSetSelection) == .success,
+              canSetSelection.boolValue else { return nil }
 
         if let focusedWindow = target?.focusedWindow {
             AXUIElementPerformAction(focusedWindow, kAXRaiseAction as CFString)
@@ -209,8 +218,9 @@ final class TextInjector {
 
         _ = setFocused(true, on: element)
         _ = restoreSelectedTextRange(target?.selectedTextRange, on: element)
-        guard shouldProceed(), verifyTargetFocus(target) else { return nil }
+        guard shouldProceed(), verifyTargetFocus(target), destinationConflict(target, checkSelection: true) == nil else { return nil }
         let before = readableValue(of: element)
+        let selection = FocusTracker.selectedTextRange(from: element)
         let result = AXUIElementSetAttributeValue(
             element,
             kAXSelectedTextAttribute as CFString,
@@ -219,24 +229,58 @@ final class TextInjector {
 
         if result == .success {
             DebugLog.shared.log("[TextInjector] directAX selectedText ok")
-            return confirmedChange(before: before, after: readableValue(of: element), insertedText: text)
+            return waitForReadback(before: before, selection: selection, element: element, insertedText: text)
                 ? .confirmed : .sentUnverified
         }
 
         DebugLog.shared.log("[TextInjector] directAX selectedText failed result=\(result.rawValue)")
+        // A timeout can mean the remote editor applied the edit without replying.
+        // Never fall through and duplicate it with Cmd-V in that case.
+        if result == .cannotComplete || readableValue(of: element) != before {
+            return waitForReadback(before: before, selection: selection, element: element, insertedText: text)
+                ? .confirmed : .sentUnverified
+        }
         return nil
     }
 
     private func readableValue(of element: AXUIElement?) -> String? {
         guard let element else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success else { return nil }
-        return value as? String
+        return FocusTracker.readableValue(of: element)
     }
 
-    private func confirmedChange(before: String?, after: String?, insertedText: String) -> Bool {
-        guard let before, let after else { return false }
-        return after != before && after.contains(insertedText.trimmingCharacters(in: .whitespacesAndNewlines))
+    static func confirmedChange(before: String?, after: String?, selection: CFRange?, insertedText: String) -> Bool {
+        guard let before, let after, let selection, selection.location >= 0, selection.length >= 0 else { return false }
+        let original = before as NSString
+        guard selection.location <= original.length, selection.length <= original.length - selection.location else { return false }
+        let expected = original.replacingCharacters(in: NSRange(location: selection.location, length: selection.length), with: insertedText)
+        return Array(after.utf16) == Array(expected.utf16)
+    }
+
+    private func waitForReadback(before: String?, selection: CFRange?, element: AXUIElement?, insertedText: String) -> Bool {
+        guard before != nil, selection != nil else { return false }
+        let deadline = Date().addingTimeInterval(0.80)
+        repeat {
+            if Self.confirmedChange(before: before, after: readableValue(of: element), selection: selection, insertedText: insertedText) { return true }
+            Thread.sleep(forTimeInterval: 0.04)
+        } while Date() < deadline
+        return false
+    }
+
+    private func destinationConflict(_ target: InsertionTarget?, checkSelection: Bool) -> String? {
+        guard let target else { return "destinationUnavailable" }
+        if target.isSecure { return "secureField" }
+        guard let field = target.focusedElement else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(field, &pid) == .success, pid == target.app?.processIdentifier else { return "destinationUnavailable" }
+        if FocusTracker.isSecureField(field) { return "secureField" }
+        if let captured = target.valueAtCapture {
+            guard let current = readableValue(of: field), Array(current.utf16) == Array(captured.utf16) else { return "draftChanged" }
+        }
+        if checkSelection, let expected = target.selectedTextRange {
+            guard let actual = FocusTracker.selectedTextRange(from: field),
+                  actual.location == expected.location, actual.length == expected.length else { return "selectionChanged" }
+        }
+        return nil
     }
 
     private func prepareForInsertion(_ text: String) -> String {
@@ -291,43 +335,42 @@ final class TextInjector {
         target: InsertionTarget?,
         restoreClipboard: Bool,
         shouldProceed: () -> Bool
-    ) -> InsertionOutcome {
-        guard shouldProceed(), verifyTargetFocus(target) else { return .failed }
+    ) -> (outcome: InsertionOutcome, reason: String) {
+        guard shouldProceed(), verifyTargetFocus(target) else { return (.failed, "destinationUnavailable") }
         let pasteboard = NSPasteboard.general
         let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
         let before = readableValue(of: target?.focusedElement)
+        let selection = target?.focusedElement.flatMap(FocusTracker.selectedTextRange(from:))
 
         pasteboard.clearContents()
         guard pasteboard.setString(text, forType: .string) else {
             DebugLog.shared.log("[TextInjector] pasteboardSetString failed")
             snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: 0)
-            return .failed
+            return (.failed, "clipboardUnavailable")
         }
+        let ownedChangeCount = pasteboard.changeCount
 
         Thread.sleep(forTimeInterval: 0.055)
 
-        guard shouldProceed(), verifyTargetFocus(target), postPasteShortcut() else {
+        guard pasteboard.changeCount == ownedChangeCount else { return (.failed, "clipboardChanged") }
+        if let reason = destinationConflict(target, checkSelection: true) { return (.failed, reason) }
+        guard shouldProceed(), pasteboard.changeCount == ownedChangeCount, verifyTargetFocus(target), postPasteShortcut() else {
             DebugLog.shared.log("[TextInjector] paste cancelled or target changed before shortcut")
             if !shouldProceed() {
-                snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: 0)
+                snapshot.restoreIfUnchanged(expectedChangeCount: ownedChangeCount, after: 0)
             }
-            return .failed
+            return (.failed, shouldProceed() ? "destinationUnavailable" : "cancelled")
         }
 
         // Let the receiving application's event loop consume paste before readback.
-        var confirmed = false
-        let deadline = Date().addingTimeInterval(before == nil ? 0.20 : 0.80)
-        repeat {
-            Thread.sleep(forTimeInterval: 0.04)
-            confirmed = confirmedChange(before: before, after: readableValue(of: target?.focusedElement), insertedText: text)
-            if confirmed { break }
-        } while Date() < deadline
+        let confirmed = waitForReadback(before: before, selection: selection, element: target?.focusedElement, insertedText: text)
+        if before == nil { Thread.sleep(forTimeInterval: 0.20) }
         DebugLog.shared.log("[TextInjector] postPasteShortcut sent confirmed=\(confirmed)")
         // Keep unverified delivery recoverable; never retry a posted paste blindly.
         if restoreClipboard && confirmed {
-            snapshot.restoreIfUnchanged(expectedChangeCount: pasteboard.changeCount, after: clipboardRestoreDelay)
+            snapshot.restoreIfUnchanged(expectedChangeCount: ownedChangeCount, after: clipboardRestoreDelay)
         }
-        return confirmed ? .confirmed : .sentUnverified
+        return (confirmed ? .confirmed : .sentUnverified, confirmed ? "verified" : "readbackUnavailable")
     }
 
     private func postPasteShortcut() -> Bool {
@@ -438,37 +481,4 @@ final class TextInjector {
         return false
     }
 
-    private func typeUnicode(text: String, shouldProceed: () -> Bool, target: InsertionTarget?) -> Bool {
-        let utf16 = Array(text.utf16)
-        let chunkSize = 16
-        var offset = 0
-        var sentAny = false
-
-        while offset < utf16.count {
-            guard shouldProceed(), verifyTargetFocus(target) else { return sentAny }
-            let end = min(offset + chunkSize, utf16.count)
-            let chunk = Array(utf16[offset..<end])
-
-            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
-                return sentAny
-            }
-
-            chunk.withUnsafeBufferPointer { ptr in
-                keyDown.keyboardSetUnicodeString(stringLength: Int(chunk.count), unicodeString: ptr.baseAddress)
-                keyUp.keyboardSetUnicodeString(stringLength: Int(chunk.count), unicodeString: ptr.baseAddress)
-            }
-
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
-            sentAny = true
-
-            offset = end
-
-            if offset < utf16.count {
-                Thread.sleep(forTimeInterval: 0.005)
-            }
-        }
-        return sentAny
-    }
 }

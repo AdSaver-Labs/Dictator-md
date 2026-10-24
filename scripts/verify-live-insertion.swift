@@ -7,6 +7,10 @@ import Carbon.HIToolbox
 struct LiveInsertionTest {
     static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--delivery-contracts") {
+            do { try checkDeliveryContracts(); exit(0) }
+            catch { fputs("Delivery contract failed: \(error)\n", stderr); exit(1) }
+        }
         if CommandLine.arguments.contains("--keyboard-layouts") {
             do { try checkKeyboardLayouts(); exit(0) }
             catch { fputs("Keyboard layout check failed: \(error)\n", stderr); exit(1) }
@@ -65,6 +69,19 @@ struct LiveInsertionTest {
         print("Five keyboard layouts verified without changing the user's input source.")
     }
 
+    static func checkDeliveryContracts() throws {
+        guard !TextInjector.confirmedChange(before: "hello old", after: "hello unrelated", selection: CFRange(location: 6, length: 3), insertedText: "hello"),
+              TextInjector.confirmedChange(before: "🙂 AFTER tail", after: "🙂 БГ tail", selection: CFRange(location: 3, length: 5), insertedText: "БГ"),
+              !TextInjector.confirmedChange(before: "hello", after: "hello hello", selection: nil, insertedText: "hello"),
+              !TextInjector.confirmedChange(before: "hello", after: "hello!", selection: CFRange(location: Int.max, length: 1), insertedText: "!"),
+              !TextInjector.confirmedChange(before: "hello", after: "hello!", selection: CFRange(location: -1, length: 1), insertedText: "!"),
+              !TextInjector.confirmedChange(before: nil, after: "hello", selection: CFRange(location: 0, length: 0), insertedText: "hello"),
+              TextInjector.confirmedChange(before: "", after: "hello", selection: CFRange(location: 0, length: 0), insertedText: "hello") else {
+            throw Failure("exact UTF-16 readback verification failed")
+        }
+        print("PASS seven exact readback contracts: replacement, UTF-16, missing values and invalid ranges")
+    }
+
     static func runSurfaceCheck() throws {
         let hermes = CommandLine.arguments.contains("hermes")
         let bundle = hermes ? "com.nousresearch.hermes" : "com.google.Chrome"
@@ -95,7 +112,7 @@ struct LiveInsertionTest {
         let title = target.focusedWindow.flatMap { attribute(kAXTitleAttribute, of: $0) } ?? ""
         if hermes {
             guard role == kAXTextAreaRole, description == "Message",
-                  ["", "What should we tackle?", "Add more context"].contains(before) else {
+                  ["", "What should we tackle?", "Add more context", "Give Hermes a task"].contains(before) else {
                 throw Failure("Refusing to modify a non-empty/non-composer Hermes field")
             }
         } else {
@@ -208,7 +225,8 @@ struct LiveInsertionTest {
             guard outcome.wasSent, state["original"]?.contains(text) == true,
                   state["other"] == "Other field", state["otherWindow"] == "Other window",
                   other["original"] == "Before AFTER tail" else {
-                throw Failure("\(label): outcome=\(outcome); wrong or missing destination")
+                // Only disposable fixture text is printed, never user editor data.
+                throw Failure("\(label): outcome=\(outcome); first=\(state) second=\(other)")
             }
             guard state["original"]!.components(separatedBy: text).count == 2 else {
                 throw Failure("\(label): duplicated insertion")
@@ -292,7 +310,65 @@ struct LiveInsertionTest {
             throw Failure("recovery overwrote a newer clipboard copy")
         }
         print("PASS failure recovery preserves newer user clipboard content")
-        print("All 10 live insertion checks passed using the production TextInjector.")
+
+        target = try capture()
+        _ = try first.command("changeDraft")
+        let changed = injector.insertWithDelivery(text: "Must not replace new draft", target: target)
+        guard changed.outcome == .failed, changed.reason == "draftChanged",
+              try first.command("snapshot")["original"] == "A completely new draft" else {
+            throw Failure("changed draft was overwritten")
+        }
+        print("PASS changed draft is preserved with an actionable delivery reason")
+
+        target = try capture()
+        _ = try first.command("rejectSelection")
+        let selectionFailure = injector.insertWithDelivery(text: "Wrong caret", target: target)
+        guard selectionFailure.outcome == .failed, selectionFailure.reason == "selectionChanged",
+              try first.command("snapshot")["original"] == "Before AFTER tail" else {
+            throw Failure("failed selection restoration must not insert at the wrong caret")
+        }
+        print("PASS refused selection restoration leaves destination unchanged")
+
+        target = try capture()
+        _ = try first.command("delayAX")
+        try assertInserted("Delayed edit", outcome: injector.insert(text: "Delayed edit", target: target), label: "delayed AX acknowledgement readback")
+
+        target = try capture()
+        _ = try first.command("clipboardOnly")
+        try assertInserted("Clipboard exact edit", outcome: injector.insert(text: "Clipboard exact edit", target: target), label: "clipboard exact selection replacement")
+
+        target = try capture()
+        _ = try first.command("copyDuringPaste")
+        let copyResult = injector.insertWithDelivery(text: "Keep the new copy", target: target)
+        try assertInserted("Keep the new copy", outcome: copyResult.outcome, label: "new user copy during receiver paste")
+        guard copyResult.outcome == .confirmed else { throw Failure("clipboard readback was not confirmed") }
+        Thread.sleep(forTimeInterval: 2.25)
+        guard NSPasteboard.general.string(forType: .string) == "New copy during paste" else {
+            throw Failure("clipboard restoration erased a newer user copy")
+        }
+        print("PASS clipboard ownership remains tied to the original write")
+
+        target = try capture()
+        _ = try first.command("closeOriginal")
+        _ = try second.command("focusOriginal")
+        let closed = injector.insertWithDelivery(text: "Closed window recovery", target: target)
+        guard closed.outcome == .failed, try first.command("snapshot")["original"] == "Before AFTER tail",
+              try second.command("snapshot")["original"] == "Before AFTER tail" else {
+            throw Failure("closed target received or redirected text")
+        }
+        print("PASS closed original window is not silently retargeted")
+
+        _ = try first.command("focusSecure")
+        var secure: InsertionTarget?
+        DispatchQueue.main.sync { secure = FocusTracker.shared.currentInsertionTarget() }
+        guard secure?.isSecure == true, secure?.valueAtCapture == nil else { throw Failure("secure field was not excluded during capture") }
+        let secureResult = injector.insertWithDelivery(text: "Not a password", target: secure)
+        guard secureResult.reason == "secureField", secureResult.outcome == .failed,
+              try first.command("snapshot")["secure"] == "" else { throw Failure("secure field received text") }
+        print("PASS secure fields are excluded without reading their contents")
+
+        try checkDeliveryContracts()
+        print("All 19 live insertion checks passed using the production TextInjector.")
     }
 
     struct Failure: Error, CustomStringConvertible {
@@ -339,7 +415,8 @@ struct LiveInsertionTest {
 final class EditorFixture {
     let directory: URL
     var windows = [NSWindow]()
-    var fields = [NSTextView]()
+    var fields = [FixtureTextView]()
+    let secureField = NSSecureTextField(frame: NSRect(x: 20, y: 120, width: 400, height: 24))
     var timer: Timer?
     var lastRequest = ""
 
@@ -360,7 +437,7 @@ final class EditorFixture {
             window.isReleasedWhenClosed = false
             let count = index == 0 ? 2 : 1
             for number in 0..<count {
-                let view = NSTextView(frame: NSRect(x: 20, y: 20 + number * 130, width: 550, height: 100))
+                let view = FixtureTextView(frame: NSRect(x: 20, y: 20 + number * 130, width: 550, height: 100))
                 view.isRichText = false
                 view.font = .systemFont(ofSize: 16)
                 window.contentView!.addSubview(view)
@@ -368,6 +445,7 @@ final class EditorFixture {
             }
             windows.append(window)
         }
+        windows[1].contentView!.addSubview(secureField)
         timer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in self?.receive() }
     }
 
@@ -378,6 +456,7 @@ final class EditorFixture {
         lastRequest = id
         switch command["action"] {
         case "reset":
+            fields.forEach { $0.mode = "normal" }
             fields[0].string = "Before AFTER tail"
             fields[1].string = "Other field"
             fields[2].string = "Other window"
@@ -386,9 +465,21 @@ final class EditorFixture {
         case "focusOtherWindow": focus(field: 2, window: 1)
         case "moveOriginal": windows[0].setFrameOrigin(NSPoint(x: 140, y: 300))
         case "resizeOriginal": windows[0].setContentSize(NSSize(width: 680, height: 330))
+        case "changeDraft": fields[0].string = "A completely new draft"
+        case "rejectSelection":
+            fields[0].setSelectedRange(NSRange(location: 0, length: 0))
+            fields[0].mode = "rejectSelection"
+        case "delayAX": fields[0].mode = "delayAX"
+        case "clipboardOnly": fields[0].mode = "clipboardOnly"
+        case "copyDuringPaste": fields[0].mode = "copyDuringPaste"
+        case "closeOriginal": windows[0].close()
+        case "focusSecure":
+            NSApp.activate(ignoringOtherApps: true)
+            windows[1].makeKeyAndOrderFront(nil)
+            windows[1].makeFirstResponder(secureField)
         default: break
         }
-        let result = ["id": id, "original": fields[0].string, "other": fields[1].string, "otherWindow": fields[2].string]
+        let result = ["id": id, "original": fields[0].string, "other": fields[1].string, "otherWindow": fields[2].string, "secure": secureField.stringValue]
         if let data = try? JSONEncoder().encode(result) {
             try? data.write(to: directory.appendingPathComponent("response.json"), options: .atomic)
         }
@@ -399,5 +490,34 @@ final class EditorFixture {
         windows[window].makeKeyAndOrderFront(nil)
         windows[window].makeFirstResponder(fields[field])
         fields[field].setSelectedRange(NSRange(location: field == 0 ? 7 : fields[field].string.utf16.count, length: field == 0 ? 5 : 0))
+    }
+}
+
+final class FixtureTextView: NSTextView {
+    var mode = "normal"
+
+    override func accessibilityIsAttributeSettable(_ attribute: NSAccessibility.Attribute) -> Bool {
+        if ["clipboardOnly", "copyDuringPaste"].contains(mode), attribute == .selectedText { return false }
+        return super.accessibilityIsAttributeSettable(attribute)
+    }
+
+    override func setAccessibilitySelectedTextRange(_ range: NSRange) {
+        if mode != "rejectSelection" { super.setAccessibilitySelectedTextRange(range) }
+    }
+
+    override func setAccessibilitySelectedText(_ text: String?) {
+        if mode == "delayAX" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { super.setAccessibilitySelectedText(text) }
+        } else {
+            super.setAccessibilitySelectedText(text)
+        }
+    }
+
+    override func paste(_ sender: Any?) {
+        super.paste(sender)
+        if mode == "copyDuringPaste" {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("New copy during paste", forType: .string)
+        }
     }
 }

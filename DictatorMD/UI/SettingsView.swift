@@ -3334,7 +3334,7 @@ private struct MonthActivityStatRow: View {
     }
 }
 
-private struct HistoryRow: View {
+struct HistoryRow: View {
     let item: DictationHistoryItem
     let colorScheme: ColorScheme
     @State private var isExpanded = false
@@ -3357,6 +3357,15 @@ private struct HistoryRow: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(item.text, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.plain)
+                .help("Copy dictation")
+                .accessibilityLabel("Copy dictation")
                 Button {
                     isTeachingCorrection = true
                 } label: {
@@ -3381,6 +3390,19 @@ private struct HistoryRow: View {
                 colorScheme: colorScheme
             )
             .frame(height: isExpanded ? expandedTextHeight : 52)
+            if let delivery = item.delivery {
+                Text(delivery.summary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .help(delivery.explanation)
+                if isExpanded {
+                    Text("\(delivery.explanation) \(delivery.strategy) · \(delivery.durationMilliseconds) ms")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+            }
             if isExpanded, let raw = item.rawText, raw != item.text {
                 DisclosureGroup("Original Recognition") {
                     Text(raw)

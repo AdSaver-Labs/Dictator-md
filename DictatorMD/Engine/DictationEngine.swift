@@ -396,6 +396,8 @@ final class DictationEngine {
         } catch {
             fputs("[DictationEngine] Failed to start recording: \(error)\n", stderr)
             DebugLog.shared.log("[DictationEngine] startRecording failed error=\(error.localizedDescription)")
+            insertionTarget = nil
+            insertionTargetApp = nil
             state = .idle
             userFacingError = "Could not start the microphone. Check microphone permission and the selected input device."
         }
@@ -414,6 +416,8 @@ final class DictationEngine {
         previewText = ""
         pendingPreviewTarget = nil
         pendingPreviewLanguage = nil
+        insertionTarget = nil
+        insertionTargetApp = nil
         userFacingError = state == .typing
             ? "Cancelled. If insertion had already started, check the destination. Your text remains in History."
             : "Dictation cancelled."
@@ -438,7 +442,7 @@ final class DictationEngine {
         state = .typing
         lastTranscription = text
         clearPendingPreview()
-        DictationMemory.shared.record(
+        let historyID = DictationMemory.shared.record(
             text: text,
             language: language,
             targetApp: target?.app,
@@ -448,10 +452,11 @@ final class DictationEngine {
         )
         let injector = textInjector
         Task.detached(priority: .userInitiated) { [weak self] in
-            let outcome = injector.insert(text: text, target: target, shouldProceed: { gate.isActive })
+            let delivery = injector.insertWithDelivery(text: text, target: target, shouldProceed: { gate.isActive })
+            DictationMemory.shared.recordDelivery(delivery, for: historyID)
             await MainActor.run { [weak self] in
                 guard gate.isActive, self?.operationID == currentOperationID else { return }
-                self?.userFacingError = Self.insertionMessage(for: outcome)
+                self?.userFacingError = Self.insertionMessage(for: delivery)
                 self?.soundFeedback.playDoneSound()
                 self?.state = .idle
             }
@@ -476,11 +481,11 @@ final class DictationEngine {
         NSPasteboard.general.setString(lastTranscription, forType: .string)
     }
 
-    private static func insertionMessage(for outcome: InsertionOutcome) -> String? {
-        switch outcome {
+    private static func insertionMessage(for delivery: InsertionDelivery) -> String? {
+        switch delivery.outcome {
         case .confirmed: nil
-        case .sentUnverified: "Paste sent but not confirmed. Your text is available on the clipboard and in History."
-        case .failed: "Could not restore the original text field. Your text is in History and copied unless you copied something else."
+        case .sentUnverified: "Paste sent but not confirmed. Check the destination before pasting again. Your text is in History and copied unless you copied something else."
+        case .failed: "\(delivery.explanation) Your text is in History and copied unless you copied something else."
         }
     }
 
@@ -513,6 +518,11 @@ final class DictationEngine {
     ///   interval (otherwise Whisper hallucinates trailing punctuation/filler from the silence).
     ///   Push-to-talk passes 0.
     private func stopRecordingAndTranscribe(trimTrailingSeconds: TimeInterval = 0) {
+        defer {
+            // The detached operation (or its preview) owns the snapshot now.
+            insertionTarget = nil
+            insertionTargetApp = nil
+        }
         guard state == .recording else {
             DebugLog.shared.log("[DictationEngine] stopRecording ignored state=\(state.rawValue)")
             return
@@ -657,9 +667,9 @@ final class DictationEngine {
                     return
                 }
                 DebugLog.shared.log("[DictationEngine] insertingText target=\(targetApp?.localizedName ?? "nil")")
-                await MainActor.run {
-                    guard gate.isActive else { return }
-                    DictationMemory.shared.record(
+                let historyID: UUID? = await MainActor.run {
+                    guard gate.isActive else { return nil }
+                    return DictationMemory.shared.record(
                         text: fullText,
                         language: detectedLanguage,
                         targetApp: targetApp,
@@ -669,12 +679,13 @@ final class DictationEngine {
                     )
                 }
                 guard gate.isActive else { return }
-                let outcome = injector.insert(text: fullText, target: target, shouldProceed: { gate.isActive })
-                DebugLog.shared.log("[DictationEngine] insertionResult outcome=\(outcome)")
+                let delivery = injector.insertWithDelivery(text: fullText, target: target, shouldProceed: { gate.isActive })
+                DictationMemory.shared.recordDelivery(delivery, for: historyID)
+                DebugLog.shared.log("[DictationEngine] insertionResult outcome=\(delivery.outcome.rawValue)")
                 await MainActor.run { [weak self] in
                     guard gate.isActive, self?.operationID == currentOperationID else { return }
                     self?.canUndoLastInsertion = false
-                    self?.userFacingError = Self.insertionMessage(for: outcome)
+                    self?.userFacingError = Self.insertionMessage(for: delivery)
                 }
             } else {
                 DebugLog.shared.log("[DictationEngine] insertionSkipped emptyOrSilence audioDuration=\(String(format: "%.2f", audioDuration))")

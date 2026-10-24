@@ -12,6 +12,7 @@ struct DictationHistoryItem: Identifiable, Codable, Equatable {
     let wordCount: Int
     let cleanupCutCount: Int?
     var rawText: String? = nil
+    var delivery: InsertionDelivery? = nil
 }
 
 struct DictationStatsEntry: Identifiable, Codable, Equatable {
@@ -88,9 +89,10 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
         load()
     }
 
-    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double, cleanupCutCount: Int = 0, rawText: String? = nil) {
+    @discardableResult
+    func record(text: String, language: AppSettings.DictationLanguage, targetApp: NSRunningApplication?, audioDuration: Double, cleanupCutCount: Int = 0, rawText: String? = nil) -> UUID? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
 
         let item = DictationHistoryItem(
             id: UUID(),
@@ -143,6 +145,17 @@ final class DictationMemory: ObservableObject, @unchecked Sendable {
             self.learnedTerms = newTerms
             self.save(Store(history: newHistory, statsEntries: newStatsEntries, learnedTerms: newTerms))
             DebugLog.shared.log("[DictationMemory] recorded words=\(item.wordCount) candidates=\(candidates.count) learned=\(newTerms.count)")
+        }
+        return item.id
+    }
+
+    func recordDelivery(_ delivery: InsertionDelivery, for id: UUID?) {
+        guard let id else { return }
+        // Enqueue behind record(), including when a very fast insertion finishes.
+        DispatchQueue.main.async {
+            guard let index = self.history.firstIndex(where: { $0.id == id }) else { return }
+            self.history[index].delivery = delivery
+            self.save(Store(history: self.history, statsEntries: self.statsEntries, learnedTerms: self.learnedTerms))
         }
     }
 

@@ -52,6 +52,11 @@ struct RecognitionSmoke {
         let legacyData = try JSONEncoder().encode(legacy)
         let decodedLegacy = try JSONDecoder().decode(DictationHistoryItem.self, from: legacyData)
         check(decodedLegacy.rawText == nil, "Legacy history decode")
+        check(decodedLegacy.delivery == nil, "Legacy history gained fabricated delivery status")
+        var delivered = legacy
+        delivered.delivery = InsertionDelivery(outcome: .sentUnverified, strategy: "clipboard", reason: "readbackUnavailable", durationMilliseconds: 123)
+        let deliveryRoundtrip = try JSONDecoder().decode(DictationHistoryItem.self, from: JSONEncoder().encode(delivered))
+        check(deliveryRoundtrip == delivered, "History delivery metadata roundtrip")
         check(RecognitionQuality.shouldRecheck(meanLogProbability: -1.4, duration: 5, usedBeamSearch: false), "Missed uncertain segment")
         check(!RecognitionQuality.shouldRecheck(meanLogProbability: -1.4, duration: 20, usedBeamSearch: false), "Unbounded retry")
         check(!RecognitionQuality.shouldRecheck(meanLogProbability: -1.4, duration: 5, usedBeamSearch: true), "Redundant beam retry")

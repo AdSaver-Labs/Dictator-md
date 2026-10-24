@@ -8,6 +8,9 @@ struct InsertionTarget {
     let clickAnchor: ClickAnchor?
     var windowFrame: CGRect? = nil
     var fieldFrame: CGRect? = nil
+    // Ephemeral only: never persist the surrounding draft or log its contents.
+    var valueAtCapture: String? = nil
+    var isSecure: Bool = false
 
     var appName: String? { app?.localizedName }
     var bundleIdentifier: String? { app?.bundleIdentifier }
@@ -110,7 +113,9 @@ final class FocusTracker {
             selectedTextRange: selectedRange,
             clickAnchor: anchor,
             windowFrame: windowFrame,
-            fieldFrame: fieldFrame
+            fieldFrame: fieldFrame,
+            valueAtCapture: focusedElement.flatMap(Self.readableValue(of:)),
+            isSecure: focusedElement.map(Self.isSecureField) ?? false
         )
     }
 
@@ -248,7 +253,21 @@ final class FocusTracker {
         return (value as! AXUIElement)
     }
 
-    private static func selectedTextRange(from element: AXUIElement) -> CFRange? {
+    static func isSecureField(_ element: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &value) == .success
+            && (value as? String) == kAXSecureTextFieldSubrole
+    }
+
+    static func readableValue(of element: AXUIElement) -> String? {
+        guard !isSecureField(element) else { return nil }
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .success,
+              let text = value as? String, text.utf16.count <= 262_144 else { return nil }
+        return text
+    }
+
+    static func selectedTextRange(from element: AXUIElement) -> CFRange? {
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             element,

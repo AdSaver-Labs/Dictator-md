@@ -1,5 +1,60 @@
 # Dictation Compatibility Checkpoint
 
+## 1.0.34 Delivery Hardening
+
+- Capture a bounded readable draft in RAM with its original UTF-16 selection.
+  Refuse insertion if the draft changed or the selection cannot be restored.
+  Secure text fields are excluded; surrounding draft text is never persisted or
+  logged. The recording/preview operation releases its snapshot on completion.
+- Confirm the expected complete edit, not a coincidental matching substring.
+  Poll delayed AX responses for at most 800 ms. A timed-out/acknowledged write
+  never falls through to a second insertion that could duplicate the text.
+- Check whether AX selected-text writes are supported before using that path.
+  Clipboard-compatible editors retain their existing routing. Clipboard failure
+  no longer triggers speculative Unicode typing into a potentially changed field.
+- Clipboard restoration uses the ownership counter captured at our write, not
+  a later counter that might belong to a new user copy during paste consumption.
+- New History items record delivery outcome, strategy, bounded reason and timing
+  alongside the existing destination bundle. Expanded rows show the explanation;
+  a Copy button provides recovery. Old history remains readable without inventing
+  delivery results. No telemetry, audio upload or new model is introduced.
+
+Local verification: expanded 19-check suite passed with disposable external
+editors, including changed drafts, rejected selections, delayed AX edits,
+clipboard-only edits, newer copies during paste, closed windows and secure fields.
+Seven exact-readback contracts also run without GUI permission in CI. The
+production History row was checked at 640 and 1120 px widths; Copy retained the
+Bulgarian text. Hermes received the unsent probe once after switching to another
+app and the other editor stayed unchanged. Hermes still reports placeholder text
+as AXValue, so this tested delivery was correctly left **unverified** rather than
+claiming an exact expected-edit match. The probe was removed without submission.
+Chrome native automation timed out; the test refused a non-test window. Chrome
+and Codex are not newly verified in this pass. Earlier compatibility results
+below are historical evidence, not a claim that every current editor state works.
+
+The installed 1.0.34 build retained the stable certificate and trusted Accessibility
+state, registered Right Option (61), and loaded the existing multilingual medium
+model. Monthly activity, History, node footprint, dashboard resizing and
+single-instance checks passed after installation. Text correction, 31 recognition/
+persistence checks, 19 language decisions and clipboard/cancellation foundations
+also passed. The microphone and ASR implementations were not changed in this slice.
+
+### Non-Negotiable Delivery Rules
+
+1. The recording owns its frozen app/window/field/selection; never substitute the
+   current foreground text box after processing starts.
+2. A new draft, unavailable selection, secure field or lost owner must result in
+   recovery, not a guessed destructive edit.
+3. A sent event or successful AX setter is not proof of delivery. Never blindly
+   retry an acknowledged, timed-out or unverified write.
+4. Preserve History before dispatch. Preserve newer clipboard copies and keep
+   an explicit Copy action available; do not promise the clipboard still holds
+   the transcript after the user copies something else.
+5. Keep AX handles/draft snapshots ephemeral. Persist only delivery metadata
+   beside the user's existing local transcript, never surrounding editor text.
+6. Run live external-editor tests before installation. Do not rotate signing,
+   reset permissions or replace the installed app to make a test appear to pass.
+
 Version 1.0.30 repairs regressions introduced by 1.0.29's target verification.
 The recorded destination no longer expires during processing or depends on the
 global latest click. The original window is restored even when another window
@@ -109,9 +164,15 @@ while decoding, and confirm both destination and clipboard content afterward.
 Run `make live-insertion-smoke` from an Accessibility-authorized local agent or
 terminal. It opens two disposable native editor processes, uses the actual
 `FocusTracker` and `TextInjector`, and asserts text, selection, duplicate count,
-destination and clipboard behavior (10 cases). It restores the initial clipboard
+destination and clipboard behavior (19 checks). It restores the initial clipboard
 and closes its fixtures afterward. CI source-contract checks are supplementary;
 headless runners cannot replace this GUI/permission-dependent test.
+
+Run `make delivery-contract-smoke` for exact readback edge cases and
+`make recognition-smoke` for backward-compatible History delivery serialization.
+`make delivery-history-ui-build` builds a disposable preview of the production
+History rows without loading the ASR engine or writing test dictations to the
+user's History. Its Finish Verification menu restores the test clipboard.
 
 For Chrome, serve `scripts/fixtures/insertion.html` locally, open it in a disposable
 native Chrome window, focus a field, then run the compiled test with

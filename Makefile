@@ -21,6 +21,7 @@ SWIFT_FILES := \
 	DictatorMD/Utilities/DebugLog.swift \
 	DictatorMD/Utilities/AppUpdater.swift \
 	DictatorMD/Utilities/DictationMemory.swift \
+	DictatorMD/Engine/InsertionDelivery.swift \
 	DictatorMD/Utilities/PersonalCorrections.swift \
 	DictatorMD/Engine/RecognitionVocabulary.swift \
 	DictatorMD/Engine/RecognitionQuality.swift \
@@ -162,6 +163,7 @@ text-smoke:
 		DictatorMD/Utilities/AppPaths.swift \
 		DictatorMD/Utilities/DebugLog.swift \
 		DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Engine/InsertionDelivery.swift \
 		DictatorMD/Utilities/PersonalCorrections.swift \
 		DictatorMD/Engine/RecognitionVocabulary.swift \
 		DictatorMD/Engine/ProsodyAnalyzer.swift \
@@ -178,6 +180,7 @@ recognition-smoke:
 	xcrun swiftc -framework AppKit -framework Foundation \
 		DictatorMD/Utilities/Settings.swift DictatorMD/Utilities/AppPaths.swift \
 		DictatorMD/Utilities/DebugLog.swift DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Engine/InsertionDelivery.swift \
 		DictatorMD/Utilities/PersonalCorrections.swift DictatorMD/Engine/RecognitionVocabulary.swift \
 		DictatorMD/Engine/RecognitionQuality.swift scripts/verify-recognition.swift \
 		-o /tmp/dictatormd-smoke/verify-recognition
@@ -189,6 +192,7 @@ recognition-audio-build:
 		-I lib -L lib $(LIBS) $(FRAMEWORKS) -parse-as-library \
 		DictatorMD/Utilities/Settings.swift DictatorMD/Utilities/AppPaths.swift \
 		DictatorMD/Utilities/DebugLog.swift DictatorMD/Utilities/DictationMemory.swift \
+		DictatorMD/Engine/InsertionDelivery.swift \
 		DictatorMD/Utilities/PersonalCorrections.swift DictatorMD/Engine/ModelManager.swift \
 		DictatorMD/Engine/RecognitionVocabulary.swift DictatorMD/Engine/RecognitionQuality.swift \
 		DictatorMD/Engine/AutoLanguageDecision.swift DictatorMD/Engine/WhisperBridge.swift \
@@ -209,6 +213,18 @@ live-insertion-smoke: live-insertion-build
 keyboard-layout-smoke: live-insertion-build
 	@/tmp/dictatormd-smoke/verify-live-insertion --keyboard-layouts
 
+.PHONY: delivery-contract-smoke
+delivery-contract-smoke: live-insertion-build
+	@/tmp/dictatormd-smoke/verify-live-insertion --delivery-contracts
+
+.PHONY: delivery-history-ui-build
+delivery-history-ui-build:
+	@mkdir -p /tmp/dictatormd-smoke
+	xcrun swiftc -sdk "$(SDK)" -import-objc-header DictatorMD/DictatorMD-Bridging-Header.h \
+		-I lib -L lib $(LIBS) $(FRAMEWORKS) -parse-as-library \
+		$(filter-out DictatorMD/App/DictatorMDApp.swift,$(SWIFT_FILES)) \
+		scripts/verify-delivery-history-ui.swift -o /tmp/dictatormd-smoke/verify-delivery-history-ui
+
 live-insertion-build:
 	@mkdir -p /tmp/dictatormd-smoke
 	xcrun swiftc -framework AppKit -framework CoreGraphics \
@@ -218,6 +234,7 @@ live-insertion-build:
 		DictatorMD/Utilities/FocusTracker.swift \
 		DictatorMD/Engine/PasteboardSnapshot.swift \
 		DictatorMD/Engine/TextInjector.swift \
+		DictatorMD/Engine/InsertionDelivery.swift \
 		scripts/verify-live-insertion.swift \
 		-o /tmp/dictatormd-smoke/verify-live-insertion
 
