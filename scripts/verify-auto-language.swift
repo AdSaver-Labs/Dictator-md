@@ -44,6 +44,14 @@ struct AutoLanguageSmoke {
             guard condition else { fatalError(label) }
             sampleChecks += 1
         }
+        check(AutoLanguageDecision.reconcile(opening: .english, broader: .bulgarian) == nil, "English opening must not become Bulgarian")
+        check(AutoLanguageDecision.reconcile(opening: .bulgarian, broader: .english) == nil, "Bulgarian opening must not become English")
+        check(AutoLanguageDecision.reconcile(opening: .english, broader: .english) == .english, "Consistent English")
+        check(AutoLanguageDecision.reconcile(opening: .bulgarian, broader: .bulgarian) == .bulgarian, "Consistent Bulgarian")
+        check(AutoLanguageDecision.reconcile(opening: nil, broader: .bulgarian) == .bulgarian, "Ambiguous greeting can broaden")
+        check(AutoLanguageDecision.reconcile(opening: nil, broader: .english) == .english, "Ambiguous greeting can broaden to English")
+        check(AutoLanguageDecision.reconcile(opening: .english, broader: nil) == nil, "Do not lock from opening alone")
+        check(AutoLanguageDecision.reconcile(opening: nil, broader: nil) == nil, "No evidence remains uncertain")
         let silence = [Float](repeating: 0, count: 32 * 16000)
         let quiet = (0..<32000).map { Float(sin(Double($0) * 0.08)) * 0.0001 }
         let original = silence + quiet

@@ -34,7 +34,8 @@ enum RecognitionVocabulary {
         Entry(spelling: "промпт, шорткът, бекенд, фронтенд", language: .bulgarian, cues: ["код", "апликац", "репо"]),
         Entry(spelling: "Openclaw, Hermes, Codex", language: .auto, cues: ["agent", "агент", "project", "проект"]),
         Entry(spelling: "Notion, Telegram, ChatGPT", language: .auto, cues: []),
-        Entry(spelling: "API, GitHub, PostgreSQL, Kubernetes", language: .auto, cues: ["code", "код", "database", "база"])
+        Entry(spelling: "API, GitHub, PostgreSQL, Kubernetes", language: .auto,
+              cues: ["code", "код", "database", "база", "git", "гит", "репо", "postgres", "постгрес", "kube", "кубер", "deploy", "деплой", "диплай"])
     ]
 
     static func allows(_ text: String, language: AppSettings.DictationLanguage) -> Bool {
@@ -66,9 +67,11 @@ enum RecognitionVocabulary {
         let relevant = eligible.filter { entry in
             !context.isEmpty && entry.cues.contains { context.contains($0) }
         }.map(\.spelling)
+        // Preserve the tested first-pass glossary order. Technical phonetic cues
+        // only promote terms when a bounded recheck has matching speech context.
         let defaults = eligible.map(\.spelling)
         // Explicit vocabulary takes priority over unverified transcript-derived terms.
-        let candidates = relevant + customTerms + confirmedTerms + defaults + baseEntries(basePrompt) + learnedTerms
+        let candidates = customTerms + confirmedTerms + relevant + defaults + baseEntries(basePrompt) + learnedTerms
         var seen = Set<String>()
         var selected: [String] = []
         for candidate in candidates {

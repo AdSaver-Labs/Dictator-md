@@ -27,6 +27,12 @@ struct RecognitionSmoke {
         check(!RecognitionVocabulary.containsCyrillic(english), "Mixed scripts in English hints")
         check(!english.contains("Transcribe"), "Instruction in hints")
         check(english.contains("Doppelherz"), "Lost brand")
+        let bulgarian = RecognitionVocabulary.prompt(language: .bulgarian, customTerms: [],
+            confirmedTerms: [], learnedTerms: [], basePrompt: "", recognizedContext: "кубернет диплаймент гитхъб постгрес", tokenBudget: 90, tokenCount: tokenCount)
+        check(bulgarian.contains("Kubernetes") && bulgarian.contains("PostgreSQL") && bulgarian.contains("GitHub"), "Relevant technical names crowded out in recheck")
+        let priority = RecognitionVocabulary.prompt(language: .bulgarian, customTerms: ["MyPriorityTerm"],
+            confirmedTerms: [], learnedTerms: [], basePrompt: "", recognizedContext: "лекарство", tokenBudget: 20, tokenCount: tokenCount)
+        check(priority.hasPrefix("MyPriorityTerm"), "Glossary cues crowded out explicit vocabulary")
 
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("dictatormd-corrections-\(UUID()).json")
         defer { try? FileManager.default.removeItem(at: url) }

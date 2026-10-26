@@ -1,6 +1,14 @@
 import Foundation
 
 enum AutoLanguageDecision {
+    /// A confident opening in the other language is a conflict, not permission
+    /// to force the entire recording into the language of its later names.
+    static func reconcile(opening: AppSettings.DictationLanguage?, broader: AppSettings.DictationLanguage?) -> AppSettings.DictationLanguage? {
+        guard let broader, broader != .auto else { return nil }
+        guard opening == nil || opening == broader else { return nil }
+        return broader
+    }
+
     static func choose(
         english: Float,
         bulgarian: Float,

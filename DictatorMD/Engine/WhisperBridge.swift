@@ -342,13 +342,13 @@ final class WhisperBridge: @unchecked Sendable {
         DebugLog.shared.log("[WhisperBridge] detectionSample offsetSeconds=\(String(format: "%.2f", Double(sample.offset) / 16000)) gain=\(String(format: "%.2f", sample.gain))")
         let englishID = whisper_lang_id("en")
         let bulgarianID = whisper_lang_id("bg")
-        // A greeting or one borrowed word is too little evidence for locking a
-        // long prompt. Use a phrase, then broaden only if it remains uncertain.
+        // Compare phrases, never a single word. Later foreign names must not
+        // silently override a confidently different opening language.
         let openingSamples = min(detectionAudio.count, 8 * 16000)
-        var cachedDetection: (sampleCount: Int, english: Float, bulgarian: Float, top: String)?
+        var cachedDetection: (offset: Int, sampleCount: Int, english: Float, bulgarian: Float, top: String)?
 
-        func detect(sampleCount: Int, requireStrongEvidence: Bool) -> AppSettings.DictationLanguage? {
-            if let cachedDetection, cachedDetection.sampleCount == sampleCount {
+        func detect(offset: Int = 0, sampleCount: Int, requireStrongEvidence: Bool) -> AppSettings.DictationLanguage? {
+            if let cachedDetection, cachedDetection.offset == offset, cachedDetection.sampleCount == sampleCount {
                 return AutoLanguageDecision.choose(
                     english: cachedDetection.english,
                     bulgarian: cachedDetection.bulgarian,
@@ -357,7 +357,7 @@ final class WhisperBridge: @unchecked Sendable {
                 )
             }
             let melStatus = detectionAudio.withUnsafeBufferPointer { ptr in
-                whisper_pcm_to_mel(context, ptr.baseAddress, Int32(sampleCount), Int32(threadCount))
+                whisper_pcm_to_mel(context, ptr.baseAddress?.advanced(by: offset), Int32(sampleCount), Int32(threadCount))
             }
             guard melStatus == 0 else {
                 DebugLog.shared.log("[WhisperBridge] autoDetection melFailed status=\(melStatus)")
@@ -373,23 +373,36 @@ final class WhisperBridge: @unchecked Sendable {
             let englishProbability = Self.probability(probabilities, id: englishID)
             let bulgarianProbability = Self.probability(probabilities, id: bulgarianID)
             let topLanguage = Self.languageCode(for: topLanguageID) ?? "unknown"
-            cachedDetection = (sampleCount, englishProbability, bulgarianProbability, topLanguage)
+            cachedDetection = (offset, sampleCount, englishProbability, bulgarianProbability, topLanguage)
             let chosen = AutoLanguageDecision.choose(
                 english: englishProbability,
                 bulgarian: bulgarianProbability,
                 topLanguage: topLanguage,
                 requireStrongEvidence: requireStrongEvidence
             )
-            DebugLog.shared.log("[WhisperBridge] autoDetection seconds=\(String(format: "%.2f", Double(sampleCount) / 16000)) top=\(topLanguage) en=\(String(format: "%.4f", englishProbability)) bg=\(String(format: "%.4f", bulgarianProbability)) chosen=\(chosen?.whisperCode ?? "uncertain")")
+            DebugLog.shared.log("[WhisperBridge] autoDetection offset=\(String(format: "%.2f", Double(offset) / 16000)) seconds=\(String(format: "%.2f", Double(sampleCount) / 16000)) top=\(topLanguage) en=\(String(format: "%.4f", englishProbability)) bg=\(String(format: "%.4f", bulgarianProbability)) chosen=\(chosen?.whisperCode ?? "uncertain")")
             return chosen
         }
 
+        let prefixLanguage = detectionAudio.count >= 5 * 16000
+            ? detect(sampleCount: 3 * 16000, requireStrongEvidence: true) : nil
+        // A separate >=4-second phrase prevents the same opening words from
+        // dominating both votes. Shorter clips still use the complete phrase.
+        let phraseOffset = prefixLanguage != nil && detectionAudio.count >= 7 * 16000 ? 3 * 16000 : 0
         if openingSamples >= 16000,
-           let openingLanguage = detect(sampleCount: openingSamples, requireStrongEvidence: true) {
-            return openingLanguage
+           let phraseLanguage = detect(offset: phraseOffset, sampleCount: openingSamples - phraseOffset, requireStrongEvidence: true) {
+            let reconciled = AutoLanguageDecision.reconcile(opening: prefixLanguage, broader: phraseLanguage)
+            if reconciled == nil {
+                DebugLog.shared.log("[WhisperBridge] autoDetection conflicting phrases; review required")
+            }
+            return reconciled
         }
         if let fullLanguage = detect(sampleCount: detectionAudio.count, requireStrongEvidence: false) {
-            return fullLanguage
+            let reconciled = AutoLanguageDecision.reconcile(opening: prefixLanguage, broader: fullLanguage)
+            if reconciled == nil {
+                DebugLog.shared.log("[WhisperBridge] autoDetection conflicting opening/full evidence; review required")
+            }
+            return reconciled
         }
         DebugLog.shared.log("[WhisperBridge] autoDetection unresolved; English draft requires review before delivery")
         return nil

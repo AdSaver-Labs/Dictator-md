@@ -1,5 +1,41 @@
 # Local Recognition Quality Protocol
 
+## 1.0.37 Verification Checkpoint
+
+Local Mac verification on 2026-10-24: the opening/independent-phrase check
+identified a synthetic EN-to-BG switch that the old overlapping-window decision
+silently accepted. Version 1.0.37 requires review for that recording. Across 19
+other shared synthetic recordings, all language/review decisions passed and all
+19 raw transcripts matched 1.0.36 exactly, with 32/32 checked specialist terms.
+The same 19 language/review checks also passed with the already-installed Silero
+VAD enabled. Text, recognition/persistence, 48 language/sampling/recovery checks,
+1,200 cold/primed keyboard lookups, five keyboard layouts and seven delivery
+readback contracts passed. The universal app built and passed strict signature
+verification.
+This preserves the baseline, including its spelling errors; it does not prove
+improved mixed-language word accuracy. The existing English output guard still
+requires Latin-script output, so Bulgarian names in English can be transliterated.
+
+A broad default-vocabulary reorder was tested and rejected after quiet Bulgarian
+regressed. This version keeps the first-pass glossary order. Technical
+phonetic cues only prioritize existing names during bounded uncertain-segment
+rechecks; explicit saved vocabulary takes precedence over glossary cues. No
+fuzzy replacement rules or new model downloads were added.
+
+Final local Mac verification on 2026-10-26: all 19 production-injector live
+external-editor checks passed. Four full ASR-to-History-to-original-editor cases
+passed (manual EN/BG and Auto EN/BG), with confirmed exact clipboard replacement
+and no edits to the other fields. Review/retry, expiry, discard, cancellation,
+stale acceptance and no pre-acceptance History/clipboard writes also passed.
+Personal History was untouched by the tests. The cold-start keyboard lookup,
+48 language/sampling/recovery and 33 recognition/persistence checks passed again.
+
+The paste, focus, clipboard, microphone, hotkey, permissions, signing and engine
+delivery files are unchanged. Installed 1.0.37 retained trusted Accessibility,
+Right Option (61), the existing medium model in Auto mode, and the 92x5 collapsed
+node footprint. Strict installed-signature verification passed. This is not a
+new physical-microphone or every-third-party-editor compatibility claim.
+
 ## Boundary
 
 RecognitionVocabulary, RecognitionQuality and PersonalCorrections improve the
@@ -57,6 +93,14 @@ must not reinterpret the current recording or replace its model while busy.
 Manual EN/BG never invokes language detection. Auto uses a detection-only copy:
 scan at most the first 60 seconds for sustained non-silent audio, keep 300 ms
 pre-roll, and examine eight seconds followed by at most thirty if uncertain.
+For recordings with at least five seconds of detection audio, cross-check a
+three-second opening phrase as well. Confident conflicting EN/BG evidence must
+return uncertainty and use the existing review/retry flow, not force one
+language. When at least seven seconds are available and the opening is confident,
+the comparison phrase starts at second three, so the same opening cannot
+dominate both votes. A short opening alone cannot establish a lock. This is a guard against
+some code-switching failures, not a per-word bilingual recognizer. Manual modes
+continue to bypass all automatic language decisions.
 Conservative energy gating is not a learned voice detector; it may retain noise.
 Detection gain is bounded to 8x. Never trim or amplify the actual decode buffer
 through this sampling step. An unsupported Slavic classification is never
@@ -99,6 +143,13 @@ Correction pairs are intentionally saved separately and survive clearing
 History. No raw microphone audio is saved, uploaded or logged. Diagnostics may
 include timing, token counts and retry counts, never dictated content.
 The audio harness generates synthetic fixtures only when explicitly run.
+
+Mixed-language fixtures concatenate language-appropriate synthetic voices. This
+does not reproduce one speaker switching languages or their accent. The harness
+refuses stale cached fixtures when reference definitions change. Set
+`DICTATOR_TEST_CONFLICT=1` with a separate scratch directory to exercise a
+conflicting EN/BG recording that must require review. Report spelling/word
+errors separately from language and review decisions, even when the latter pass.
 
 ## Verification
 

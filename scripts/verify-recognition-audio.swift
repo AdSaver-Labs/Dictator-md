@@ -4,7 +4,11 @@ import Foundation
 /// Synthetic speech is a wiring/accuracy smoke test, not a substitute for a user's recordings.
 @main
 struct RecognitionAudioSmoke {
-    struct Fixture: Codable {
+    struct SpeechPart: Codable, Equatable {
+        let voice: String
+        let text: String
+    }
+    struct Fixture: Codable, Equatable {
         let voice: String
         let text: String
         let expectedLanguage: String
@@ -12,6 +16,8 @@ struct RecognitionAudioSmoke {
         var leadingSilenceSeconds: Double = 0
         var gain: Float = 1
         var requestedLanguage: String = "auto"
+        var parts: [SpeechPart] = []
+        var expectedReview: Bool?
     }
     struct Result: Codable {
         let fixture: Int
@@ -24,6 +30,7 @@ struct RecognitionAudioSmoke {
         let expectedTerms: Int
         let languageMatched: Bool
         let requiresLanguageReview: Bool
+        let reviewMatched: Bool
     }
 
     static func main() throws {
@@ -53,23 +60,53 @@ struct RecognitionAudioSmoke {
             Fixture(voice: "Daria", text: "Искам да запишем тази бележка на български. Днес пътувах до Благоевград.", expectedLanguage: "bg", terms: ["Благоевград"], leadingSilenceSeconds: 32),
             Fixture(voice: "Samantha", text: "I want to record this note in English. Today I reviewed the application settings.", expectedLanguage: "en", terms: [], leadingSilenceSeconds: 32)
         ]
-        try JSONEncoder().encode(fixtures).write(to: directory.appendingPathComponent("references.json"), options: .atomic)
+        fixtures += [
+            Fixture(voice: "Daria", text: "Помоли Хермес да провери деплоймента в Кубернетес и да качи промените в Гитхъб.", expectedLanguage: "bg", terms: ["Hermes", "Kubernetes", "GitHub"]),
+            Fixture(voice: "Samantha", text: "Please keep the Bulgarian names Благоевград and Кюстендил unchanged in this note.", expectedLanguage: "en", terms: [], parts: [
+                SpeechPart(voice: "Samantha", text: "Please keep the Bulgarian names"),
+                SpeechPart(voice: "Daria", text: "Благоевград"),
+                SpeechPart(voice: "Samantha", text: "and"),
+                SpeechPart(voice: "Daria", text: "Кюстендил"),
+                SpeechPart(voice: "Samantha", text: "unchanged in this note.")]),
+            Fixture(voice: "Daria", text: "Моля провери настройките на проекта в GitHub and Kubernetes преди срещата утре.", expectedLanguage: "bg", terms: ["GitHub", "Kubernetes"], parts: [
+                SpeechPart(voice: "Daria", text: "Моля провери настройките на проекта в"),
+                SpeechPart(voice: "Samantha", text: "GitHub and Kubernetes"),
+                SpeechPart(voice: "Daria", text: "преди срещата утре.")])
+        ]
+        if ProcessInfo.processInfo.environment["DICTATOR_TEST_CONFLICT"] == "1" {
+            fixtures = [Fixture(voice: "Samantha", text: "Please write down the following names for this project. Днес проверих настройките на приложението и историята на всички съобщения. Утре ще пътувам до Благоевград и Кюстендил.", expectedLanguage: "en", terms: [], parts: [
+                SpeechPart(voice: "Samantha", text: "Please write down the following names for this project."),
+                SpeechPart(voice: "Daria", text: "Днес проверих настройките на приложението и историята на всички съобщения. Утре ще пътувам до Благоевград и Кюстендил.")], expectedReview: true)]
+        }
+        let referencesURL = directory.appendingPathComponent("references.json")
+        if let previous = try? Data(contentsOf: referencesURL) {
+            guard try JSONDecoder().decode([Fixture].self, from: previous) == fixtures else {
+                fatalError("Fixture definitions changed; use a fresh scratch directory rather than stale cached audio")
+            }
+        }
+        try JSONEncoder().encode(fixtures).write(to: referencesURL, options: .atomic)
         let bridge = try WhisperBridge(modelPath: CommandLine.arguments[1])
         let useVAD = ProcessInfo.processInfo.environment["DICTATOR_TEST_VAD"] == "1"
         var results: [Result] = []
         for (index, fixture) in fixtures.enumerated() {
-            let source = directory.appendingPathComponent("\(index).aiff")
-            let converted = directory.appendingPathComponent("\(index).caf")
-            if !FileManager.default.fileExists(atPath: converted.path) {
-                try run("/usr/bin/say", ["-v", fixture.voice, "-o", source.path, fixture.text])
-                try run("/usr/bin/afconvert", [source.path, "-o", converted.path, "-f", "caff", "-d", "LEF32@16000", "-c", "1"])
+            let parts = fixture.parts.isEmpty ? [SpeechPart(voice: fixture.voice, text: fixture.text)] : fixture.parts
+            var speech: [Float] = []
+            for (partIndex, part) in parts.enumerated() {
+                let stem = fixture.parts.isEmpty ? "\(index)" : "\(index)-\(partIndex)"
+                let source = directory.appendingPathComponent("\(stem).aiff")
+                let converted = directory.appendingPathComponent("\(stem).caf")
+                if !FileManager.default.fileExists(atPath: converted.path) {
+                    try run("/usr/bin/say", ["-v", part.voice, "-o", source.path, part.text])
+                    try run("/usr/bin/afconvert", [source.path, "-o", converted.path, "-f", "caff", "-d", "LEF32@16000", "-c", "1"])
+                }
+                let file = try AVAudioFile(forReading: converted)
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else { fatalError("Audio allocation") }
+                try file.read(into: buffer)
+                guard let samples = buffer.floatChannelData?[0] else { fatalError("Expected Float32 audio") }
+                speech += Array(UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength)))
             }
-            let file = try AVAudioFile(forReading: converted)
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else { fatalError("Audio allocation") }
-            try file.read(into: buffer)
-            guard let samples = buffer.floatChannelData?[0] else { fatalError("Expected Float32 audio") }
             let audio = [Float](repeating: 0, count: Int(fixture.leadingSilenceSeconds * 16000))
-                + Array(UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength))).map { $0 * fixture.gain }
+                + speech.map { $0 * fixture.gain }
             let requestedLanguage = AppSettings.DictationLanguage(rawValue: fixture.requestedLanguage)!
             let start = Date()
             #if BASELINE
@@ -87,14 +124,14 @@ struct RecognitionAudioSmoke {
                 language: transcription.language.rawValue, seconds: Date().timeIntervalSince(start),
                 wordErrorRate: wordErrorRate(reference: fixture.text, actual: transcription.text),
                 recognizedTerms: found, expectedTerms: fixture.terms.count, languageMatched: languageMatched,
-                requiresLanguageReview: needsReview)
+                requiresLanguageReview: needsReview, reviewMatched: needsReview == (fixture.expectedReview ?? false))
             results.append(result)
-            print("Fixture \(index): \(result.language) languageMatched=\(languageMatched) WER=\(String(format: "%.3f", result.wordErrorRate)) terms=\(found)/\(fixture.terms.count) seconds=\(String(format: "%.2f", result.seconds))")
+            print("Fixture \(index): \(result.language) languageMatched=\(languageMatched) reviewMatched=\(result.reviewMatched) WER=\(String(format: "%.3f", result.wordErrorRate)) terms=\(found)/\(fixture.terms.count) seconds=\(String(format: "%.2f", result.seconds))")
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(results).write(to: URL(fileURLWithPath: CommandLine.arguments[3]), options: .atomic)
-        guard results.allSatisfy({ $0.languageMatched && !$0.requiresLanguageReview }) else { exit(1) }
+        guard results.allSatisfy({ $0.languageMatched && $0.reviewMatched }) else { exit(1) }
     }
 
     private static func wordErrorRate(reference: String, actual: String) -> Double {
